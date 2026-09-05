@@ -1,21 +1,13 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, BookOpenCheck, LogOut, RefreshCw, Filter, Search, Activity, Download, Lock, User, LayoutDashboard, MapPin, Layers } from "lucide-react";
+import { ArrowLeft, BookOpenCheck, LogOut, RefreshCw, Filter, Search, Activity, Download, LayoutDashboard, MapPin, Layers } from "lucide-react";
 
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwtCMnX7JgApy0BLFdhs7ByumM8H9JGjLLgDbYMBMpuQjtPHuzywoDesSz1lYZ-hYwE/exec";
 
-export default function WeeklyRisalaDashboard({ onBack }) {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userId, setUserId] = useState("");
-  const [password, setPassword] = useState("");
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState("");
-  
-  const [token, setToken] = useState("");
-  const [officeUser, setOfficeUser] = useState({});
+export default function WeeklyRisalaDashboard({ onBack, token, officeUser, onLogout }) {
   const [dashboardData, setDashboardData] = useState({ b4Value: "", b6Value: "", totalRows: 0 });
   const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
 
   const [search, setSearch] = useState("");
@@ -30,47 +22,8 @@ export default function WeeklyRisalaDashboard({ onBack }) {
   const rowsPerPage = 10;
 
   useEffect(() => {
-    const storedToken = sessionStorage.getItem("risalaToken");
-    const storedUser = sessionStorage.getItem("risalaUser");
-    if (storedToken && storedUser) {
-        setToken(storedToken);
-        setOfficeUser(JSON.parse(storedUser));
-        setIsLoggedIn(true);
-        fetchDashboard(storedToken);
-    }
-  }, []);
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setAuthLoading(true);
-    setAuthError("");
-    try {
-        const res = await fetch(`${SCRIPT_URL}?action=login&userId=${encodeURIComponent(userId)}&password=${encodeURIComponent(password)}`);
-        const d = await res.json();
-        if (d.status === "Success") {
-            sessionStorage.setItem("risalaToken", d.token);
-            sessionStorage.setItem("risalaUser", JSON.stringify(d.user));
-            setToken(d.token);
-            setOfficeUser(d.user);
-            setIsLoggedIn(true);
-            fetchDashboard(d.token);
-        } else {
-            setAuthError(d.message || "Invalid credentials.");
-        }
-    } catch (err) {
-        setAuthError("Network Error. Cannot connect to server.");
-    }
-    setAuthLoading(false);
-  };
-
-  const handleLogout = () => {
-    sessionStorage.removeItem("risalaToken");
-    sessionStorage.removeItem("risalaUser");
-    setIsLoggedIn(false);
-    setToken("");
-    setOfficeUser({});
-    setRows([]);
-  };
+    if (token) fetchDashboard(token);
+  }, [token]);
 
   const fetchDashboard = async (tkn) => {
     setLoading(true);
@@ -83,8 +36,8 @@ export default function WeeklyRisalaDashboard({ onBack }) {
             setRows(Array.isArray(d.rows) ? d.rows : []);
         } else {
             if (/session|login required|invalid/i.test(d.message || "")) {
-                handleLogout();
-                alert("Session expired. Please login again.");
+                alert("Session expired or unauthorized. Please login again.");
+                onLogout();
             } else {
                 setFetchError(d.message || "Failed to load data.");
             }
@@ -174,46 +127,6 @@ export default function WeeklyRisalaDashboard({ onBack }) {
     </div>
   );
 
-  if (!isLoggedIn) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0f1c] relative overflow-hidden font-sans">
-        <div className="absolute inset-0 z-0">
-          <div className="absolute top-[20%] left-[20%] w-[30rem] h-[30rem] bg-emerald-600/20 rounded-full blur-[120px] mix-blend-screen"></div>
-        </div>
-        <div className="relative z-10 w-full max-w-lg p-8 sm:p-12 bg-[#121929]/70 backdrop-blur-2xl border border-white/5 rounded-3xl shadow-[0_0_60px_rgba(16,185,129,0.1)]">
-          <button onClick={onBack} className="absolute top-6 left-6 text-slate-400 hover:text-emerald-400 transition-colors"><ArrowLeft className="w-5 h-5" /></button>
-          <div className="flex flex-col items-center justify-center mb-10 text-center mt-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(16,185,129,0.4)] border border-white/20">
-              <BookOpenCheck className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-white tracking-wide">WEEKLY <span className="text-emerald-400 font-light">RISALA</span></h1>
-            <p className="text-slate-400 text-xs mt-2 font-medium tracking-widest uppercase">Office Authentication</p>
-          </div>
-          {authError && <div className="mb-6 p-4 bg-red-900/40 border border-red-500/50 text-red-400 text-sm rounded-xl text-center backdrop-blur-sm">{authError}</div>}
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-emerald-400 uppercase tracking-widest ml-1">User ID</label>
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><User className="w-5 h-5 text-slate-500 group-focus-within:text-emerald-400 transition-colors" /></div>
-                <input type="text" required value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="Enter assigned user ID" className="w-full pl-12 pr-4 py-4 bg-[#0a0f1c]/80 border border-slate-700/50 rounded-xl text-white placeholder-slate-600 focus:bg-[#0a0f1c] focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-emerald-400 uppercase tracking-widest ml-1">Password</label>
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><Lock className="w-5 h-5 text-slate-500 group-focus-within:text-emerald-400 transition-colors" /></div>
-                <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full pl-12 pr-4 py-4 bg-[#0a0f1c]/80 border border-slate-700/50 rounded-xl text-white placeholder-slate-600 focus:bg-[#0a0f1c] focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all" />
-              </div>
-            </div>
-            <button type="submit" disabled={authLoading} className="w-full py-4 px-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all duration-300 transform active:scale-[0.98] flex justify-center items-center gap-3 mt-8 border border-white/10">
-              {authLoading ? "VERIFYING..." : "ACCESS DASHBOARD"}
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
   const regionData = groupCount(filteredRows, "region");
   const maxRegionCount = regionData.length ? Math.max(...regionData.map(d => d.count)) : 0;
 
@@ -237,7 +150,7 @@ export default function WeeklyRisalaDashboard({ onBack }) {
             </div>
             <div className="flex flex-wrap items-center justify-center md:justify-end gap-3 w-full md:w-auto">
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-700 hidden lg:block">
-                User: <span className="text-emerald-400">{officeUser.name || officeUser.userId}</span>
+                User: <span className="text-emerald-400">{officeUser?.name || officeUser?.userId || "Admin"}</span>
               </div>
               <button onClick={() => fetchDashboard(token)} disabled={loading} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#1a2333] hover:bg-[#222d42] text-emerald-400 px-4 py-2.5 rounded-xl border border-emerald-500/20 transition-all active:scale-95">
                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> <span className="hidden sm:inline">Sync</span>
@@ -245,7 +158,7 @@ export default function WeeklyRisalaDashboard({ onBack }) {
               <button onClick={downloadCSV} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-900/30 hover:bg-teal-900/50 text-teal-400 px-4 py-2.5 rounded-xl border border-teal-500/30 transition-all active:scale-95">
                 <Download className="w-4 h-4" /> <span className="hidden sm:inline">Excel</span>
               </button>
-              <button onClick={handleLogout} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-red-500/10 hover:bg-red-500/20 text-red-400 px-4 py-2.5 rounded-xl border border-red-500/20 transition-all active:scale-95">
+              <button onClick={onLogout} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-red-500/10 hover:bg-red-500/20 text-red-400 px-4 py-2.5 rounded-xl border border-red-500/20 transition-all active:scale-95">
                 <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Logout</span>
               </button>
             </div>
@@ -312,8 +225,6 @@ export default function WeeklyRisalaDashboard({ onBack }) {
 
           {/* Charts Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
-            {/* Region Bar Chart */}
             <div className="bg-[#121929]/60 backdrop-blur-md rounded-2xl border border-emerald-500/20 p-5 shadow-[0_0_20px_rgba(16,185,129,0.05)] h-[320px] flex flex-col">
                <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-4">REPORTS BY REGION</h3>
                <div className="flex-1 flex items-end gap-2 pb-2">
@@ -331,7 +242,6 @@ export default function WeeklyRisalaDashboard({ onBack }) {
                  }) : <div className="w-full text-center text-slate-500 text-xs my-auto">No data</div>}
                </div>
             </div>
-
             <MiniTable title="REPORTS BY STATE" data={groupCount(filteredRows, "state")} />
             <MiniTable title="REPORTS BY DEPARTMENT" data={groupCount(filteredRows, "department")} />
             <MiniTable title="REPORTS BY DIVISION" data={groupCount(filteredRows, "division")} />
@@ -345,7 +255,6 @@ export default function WeeklyRisalaDashboard({ onBack }) {
                 <p className="text-[11px] text-slate-500 mt-1 uppercase tracking-widest">Source: {dashboardData.totalRows} • Visible: {filteredRows.length}</p>
               </div>
             </div>
-            
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm whitespace-nowrap">
                 <thead className="bg-[#0a0f1c]/50">
@@ -376,8 +285,6 @@ export default function WeeklyRisalaDashboard({ onBack }) {
                 </tbody>
               </table>
             </div>
-
-            {/* Pagination */}
             {filteredRows.length > rowsPerPage && (
               <div className="p-4 border-t border-white/5 bg-black/20 flex justify-center items-center gap-2">
                 <button disabled={currentPage===1} onClick={()=>setCurrentPage(p=>p-1)} className="px-3 py-1.5 rounded-lg border border-white/10 bg-slate-800 text-xs font-bold text-slate-300 disabled:opacity-30">PREV</button>
@@ -386,7 +293,6 @@ export default function WeeklyRisalaDashboard({ onBack }) {
               </div>
             )}
           </div>
-
         </main>
       </div>
     </div>
