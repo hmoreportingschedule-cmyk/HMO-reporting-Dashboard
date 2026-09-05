@@ -1,8 +1,9 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Lock, User, LogOut, Network, ArrowRight, Loader2, LayoutGrid, Building2, BookOpen } from "lucide-react";
+import { Lock, User, LogOut, Network, ArrowRight, Loader2, Building2, BookOpen, FileText } from "lucide-react";
 import DeeniKaamDashboard from "../components/DeeniKaamDashboard";
 import DepartmentDashboard from "../components/DepartmentDashboard";
+import WeeklyRisalaDashboard from "../components/WeeklyRisalaDashboard";
 
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "admin123";
@@ -13,7 +14,7 @@ export default function App() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
-  const [currentView, setCurrentView] = useState("hub"); // hub, deeni, department
+  const [currentView, setCurrentView] = useState("hub"); // hub, deeni, department, weekly_risala
 
   useEffect(() => {
     const session = localStorage.getItem("hmo_auth");
@@ -106,6 +107,10 @@ export default function App() {
     return <DepartmentDashboard onBack={() => setCurrentView("hub")} />;
   }
 
+  if (currentView === "weekly_risala") {
+    return <WeeklyRisalaDashboard onBack={() => setCurrentView("hub")} />;
+  }
+
   return (
     <div className="min-h-screen bg-[#0a0f1c] relative overflow-hidden font-sans text-slate-300 flex items-center justify-center p-4 sm:p-8">
        <div className="absolute inset-0 z-0">
@@ -113,7 +118,7 @@ export default function App() {
          <div className="absolute bottom-[10%] right-[10%] w-[30rem] h-[30rem] bg-fuchsia-600/10 rounded-full blur-[120px] mix-blend-screen"></div>
        </div>
 
-       <div className="relative z-10 w-full max-w-5xl">
+       <div className="relative z-10 w-full max-w-7xl">
          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-12 gap-4">
            <div>
              <h1 className="text-3xl font-bold text-white tracking-wide">HMO <span className="text-cyan-400 font-light">DASHBOARD HUB</span></h1>
@@ -124,32 +129,48 @@ export default function App() {
            </button>
          </div>
 
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+         {/* Updated to grid-cols-3 for 3 cards */}
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+           
            {/* Deeni Kaam Card */}
-           <button onClick={() => setCurrentView("deeni")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-cyan-500/20 shadow-[0_0_20px_rgba(6,182,212,0.1)] hover:shadow-[0_0_40px_rgba(6,182,212,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden">
+           <button onClick={() => setCurrentView("deeni")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-cyan-500/20 shadow-[0_0_20px_rgba(6,182,212,0.1)] hover:shadow-[0_0_40px_rgba(6,182,212,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
               <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl group-hover:bg-cyan-500/20 transition-all"></div>
               <div className="w-16 h-16 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <BookOpen className="w-8 h-8 text-cyan-400" />
               </div>
               <h2 className="text-2xl font-bold text-white mb-2 tracking-wide">12 Deeni Kaam</h2>
-              <p className="text-slate-400 text-sm leading-relaxed mb-6">Access the live analytics dashboard for 12 Deeni Kaam metrics, targets, and regional reports.</p>
-              <div className="flex items-center gap-2 text-cyan-400 text-sm font-bold tracking-widest uppercase">
+              <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">Access the live analytics dashboard for 12 Deeni Kaam metrics, targets, and regional reports.</p>
+              <div className="flex items-center gap-2 text-cyan-400 text-sm font-bold tracking-widest uppercase mt-auto">
                 Enter Portal <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
               </div>
            </button>
 
+           {/* Weekly Risala Card */}
+           <button onClick={() => setCurrentView("weekly_risala")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.1)] hover:shadow-[0_0_40px_rgba(16,185,129,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all"></div>
+              <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <FileText className="w-8 h-8 text-emerald-400" />
+              </div>
+              <h2 className="text-xl font-bold text-white mb-2 tracking-wide">Weekly Risala Live Report</h2>
+              <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">Under Construction. Monitor weekly risala distribution and performance.</p>
+              <div className="flex items-center gap-2 text-emerald-400 text-sm font-bold tracking-widest uppercase mt-auto">
+                Coming Soon <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
+              </div>
+           </button>
+
            {/* Department Card */}
-           <button onClick={() => setCurrentView("department")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-fuchsia-500/20 shadow-[0_0_20px_rgba(217,70,239,0.1)] hover:shadow-[0_0_40px_rgba(217,70,239,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden">
+           <button onClick={() => setCurrentView("department")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-fuchsia-500/20 shadow-[0_0_20px_rgba(217,70,239,0.1)] hover:shadow-[0_0_40px_rgba(217,70,239,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
               <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-500/10 rounded-full blur-2xl group-hover:bg-fuchsia-500/20 transition-all"></div>
               <div className="w-16 h-16 bg-fuchsia-500/10 border border-fuchsia-500/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Building2 className="w-8 h-8 text-fuchsia-400" />
               </div>
               <h2 className="text-2xl font-bold text-white mb-2 tracking-wide">Department Report</h2>
-              <p className="text-slate-400 text-sm leading-relaxed mb-6">Under Construction. Future module for detailed departmental analytics and performance tracking.</p>
-              <div className="flex items-center gap-2 text-fuchsia-400 text-sm font-bold tracking-widest uppercase">
+              <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">Under Construction. Future module for detailed departmental analytics and performance tracking.</p>
+              <div className="flex items-center gap-2 text-fuchsia-400 text-sm font-bold tracking-widest uppercase mt-auto">
                 Coming Soon <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
               </div>
            </button>
+
          </div>
        </div>
     </div>
