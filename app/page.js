@@ -98,13 +98,13 @@ export default function App() {
             <div className="w-16 h-16 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(34,211,238,0.4)] border border-white/20">
               <Network className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-white tracking-wide">SECURE <span className="text-cyan-400 font-light">PORTAL</span></h1>
-            <p className="text-slate-400 text-sm mt-2 font-medium tracking-widest uppercase">HMO Network Identity</p>
+            <h1 className="text-3xl font-bold text-white tracking-wide">Dawateislami <span className="text-cyan-400 font-light">India</span></h1>
+            <p className="text-slate-400 text-sm mt-2 font-medium tracking-widest uppercase">Hind Mushawarat Office</p>
           </div>
           {loginError && <div className="mb-6 p-4 bg-red-900/40 border border-red-500/50 text-red-400 text-sm rounded-xl text-center backdrop-blur-sm">{loginError}</div>}
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-cyan-400 uppercase tracking-widest ml-1">Admin ID / User ID</label>
+              <label className="text-xs font-bold text-cyan-400 uppercase tracking-widest ml-1">User ID</label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <User className="w-5 h-5 text-slate-500 group-focus-within:text-cyan-400 transition-colors" />
@@ -113,7 +113,7 @@ export default function App() {
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold text-cyan-400 uppercase tracking-widest ml-1">Passkey</label>
+              <label className="text-xs font-bold text-cyan-400 uppercase tracking-widest ml-1">Password</label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <Lock className="w-5 h-5 text-slate-500 group-focus-within:text-cyan-400 transition-colors" />
@@ -159,7 +159,7 @@ export default function App() {
              <p className="text-slate-400 text-sm mt-1 uppercase tracking-widest">Select a portal to continue</p>
            </div>
            <button onClick={handleLogout} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-red-500/10 hover:bg-red-500/20 text-red-400 px-4 py-2.5 rounded-xl border border-red-500/20 transition-all active:scale-95">
-             <LogOut className="w-4 h-4" /> Terminate
+             <LogOut className="w-4 h-4" /> Logout
            </button>
          </div>
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
