@@ -1,9 +1,11 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Lock, User, LogOut, Network, ArrowRight, Loader2, Building2, BookOpen, FileText } from "lucide-react";
+import { Lock, User, LogOut, Network, ArrowRight, Loader2, Building2, BookOpen, FileText, Briefcase, Users } from "lucide-react";
 import DeeniKaamDashboard from "../components/DeeniKaamDashboard";
 import DepartmentDashboard from "../components/DepartmentDashboard";
 import WeeklyRisalaDashboard from "../components/WeeklyRisalaDashboard";
+import TaskOfficeDashboard from "../components/TaskOfficeDashboard";
+import TaskIndiaDashboard from "../components/TaskIndiaDashboard";
 
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "admin123";
@@ -24,7 +26,7 @@ export default function App() {
   useEffect(() => {
     const authType = sessionStorage.getItem("hmo_auth_type");
     if (authType === "superadmin") {
-        setAccessiblePortals(["deeni", "department", "weekly_risala"]);
+        setAccessiblePortals(["deeni", "department", "weekly_risala", "task_office", "task_india"]);
         setIsAuthenticated(true);
     } else if (authType === "user") {
         const token = sessionStorage.getItem("risalaToken");
@@ -42,19 +44,17 @@ export default function App() {
     setIsAuthenticating(true);
     setLoginError("");
 
-    // Check Super Admin First
     if (username === ADMIN_USER && password === ADMIN_PASS) {
         setTimeout(() => {
             setIsAuthenticated(true);
             sessionStorage.setItem("hmo_auth_type", "superadmin");
-            setAccessiblePortals(["deeni", "department", "weekly_risala"]);
+            setAccessiblePortals(["deeni", "department", "weekly_risala", "task_office", "task_india"]);
             setCurrentView("hub");
             setIsAuthenticating(false);
         }, 1000);
         return;
     }
 
-    // Check Google Script Users (e.g., Weekly Risala Users)
     try {
         const res = await fetch(`${SCRIPT_URL}?action=login&userId=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`);
         const d = await res.json();
@@ -66,7 +66,7 @@ export default function App() {
             setRisalaUser(d.user);
             setAccessiblePortals(["weekly_risala"]);
             setIsAuthenticated(true);
-            setCurrentView("weekly_risala"); // Auto Redirect since they only have 1 portal
+            setCurrentView("weekly_risala");
         } else {
             setLoginError(d.message || "Access Denied. Invalid credentials.");
         }
@@ -130,13 +130,10 @@ export default function App() {
     );
   }
 
-  if (currentView === "deeni") {
-    return <DeeniKaamDashboard onBack={() => setCurrentView("hub")} onLogout={handleLogout} />;
-  }
-
-  if (currentView === "department") {
-    return <DepartmentDashboard onBack={() => setCurrentView("hub")} />;
-  }
+  if (currentView === "deeni") return <DeeniKaamDashboard onBack={() => setCurrentView("hub")} onLogout={handleLogout} />;
+  if (currentView === "department") return <DepartmentDashboard onBack={() => setCurrentView("hub")} />;
+  if (currentView === "task_office") return <TaskOfficeDashboard onBack={() => setCurrentView("hub")} />;
+  if (currentView === "task_india") return <TaskIndiaDashboard onBack={() => setCurrentView("hub")} />;
 
   if (currentView === "weekly_risala") {
     const handleBack = () => {
@@ -188,6 +185,28 @@ export default function App() {
                 <h2 className="text-2xl font-bold text-white mb-2 tracking-wide">Department Report</h2>
                 <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">Under Construction. Future module for detailed departmental analytics.</p>
                 <div className="flex items-center gap-2 text-fuchsia-400 text-sm font-bold tracking-widest uppercase mt-auto">Coming Soon <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
+             </button>
+           )}
+
+           {/* Task Management - Office Zimmedaran */}
+           {accessiblePortals.includes("task_office") && (
+             <button onClick={() => setCurrentView("task_office")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.1)] hover:shadow-[0_0_40px_rgba(59,130,246,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all"></div>
+                <div className="w-16 h-16 bg-blue-500/10 border border-blue-500/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><Briefcase className="w-8 h-8 text-blue-400" /></div>
+                <h2 className="text-xl font-bold text-white mb-2 tracking-wide">Task Mgmt (Office)</h2>
+                <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">Under Construction. Task management for Office Zimmedaran.</p>
+                <div className="flex items-center gap-2 text-blue-400 text-sm font-bold tracking-widest uppercase mt-auto">Coming Soon <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
+             </button>
+           )}
+
+           {/* Task Management - India Zimmedaran */}
+           {accessiblePortals.includes("task_india") && (
+             <button onClick={() => setCurrentView("task_india")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.1)] hover:shadow-[0_0_40px_rgba(245,158,11,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition-all"></div>
+                <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><Users className="w-8 h-8 text-amber-400" /></div>
+                <h2 className="text-xl font-bold text-white mb-2 tracking-wide">Task Mgmt (India)</h2>
+                <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">Under Construction. Task management for Dawateislami India Zimmedaran.</p>
+                <div className="flex items-center gap-2 text-amber-400 text-sm font-bold tracking-widest uppercase mt-auto">Coming Soon <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
              </button>
            )}
          </div>
