@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Lock, User, LogOut, Network, ArrowRight, Loader2, Building2, BookOpen, FileText, Briefcase, Users, ClipboardCheck, CalendarDays } from "lucide-react";
+import { Lock, User, LogOut, Network, ArrowRight, Loader2, Building2, BookOpen, FileText, Briefcase, Users, ClipboardCheck, CalendarDays, Key } from "lucide-react";
 import DeeniKaamDashboard from "../components/DeeniKaamDashboard";
 import DepartmentDashboard from "../components/DepartmentDashboard";
 import WeeklyRisalaDashboard from "../components/WeeklyRisalaDashboard";
@@ -8,6 +8,7 @@ import TaskOfficeDashboard from "../components/TaskOfficeDashboard";
 import TaskIndiaDashboard from "../components/TaskIndiaDashboard";
 import AuditDashboard from "../components/AuditDashboard";
 import HindMushawaratTaskDashboard from "../components/HindMushawaratTaskDashboard";
+import UserAccessDashboard from "../components/UserAccessDashboard";
 
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "admin123";
@@ -28,7 +29,7 @@ export default function App() {
   useEffect(() => {
     const authType = sessionStorage.getItem("hmo_auth_type");
     if (authType === "superadmin") {
-        setAccessiblePortals(["deeni", "department", "weekly_risala", "task_office", "task_india", "audit", "hm_task"]);
+        setAccessiblePortals(["deeni", "department", "weekly_risala", "task_office", "task_india", "audit", "hm_task", "user_access"]);
         setIsAuthenticated(true);
     } else if (authType === "user") {
         const token = sessionStorage.getItem("risalaToken");
@@ -50,7 +51,7 @@ export default function App() {
         setTimeout(() => {
             setIsAuthenticated(true);
             sessionStorage.setItem("hmo_auth_type", "superadmin");
-            setAccessiblePortals(["deeni", "department", "weekly_risala", "task_office", "task_india", "audit", "hm_task"]);
+            setAccessiblePortals(["deeni", "department", "weekly_risala", "task_office", "task_india", "audit", "hm_task", "user_access"]);
             setCurrentView("hub");
             setIsAuthenticating(false);
         }, 1000);
@@ -138,6 +139,7 @@ export default function App() {
   if (currentView === "task_india") return <TaskIndiaDashboard onBack={() => setCurrentView("hub")} />;
   if (currentView === "audit") return <AuditDashboard onBack={() => setCurrentView("hub")} />;
   if (currentView === "hm_task") return <HindMushawaratTaskDashboard onBack={() => setCurrentView("hub")} />;
+  if (currentView === "user_access") return <UserAccessDashboard onBack={() => setCurrentView("hub")} />;
 
   if (currentView === "weekly_risala") {
     const handleBack = () => {
@@ -209,8 +211,6 @@ export default function App() {
                 <div className="flex items-center gap-2 text-amber-400 text-sm font-bold tracking-widest uppercase mt-auto">Coming Soon <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
              </button>
            )}
-           
-           {/* New: Audit Dashboard */}
            {accessiblePortals.includes("audit") && (
              <button onClick={() => setCurrentView("audit")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-indigo-500/20 shadow-[0_0_20px_rgba(99,102,241,0.1)] hover:shadow-[0_0_40px_rgba(99,102,241,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl group-hover:bg-indigo-500/20 transition-all"></div>
@@ -220,8 +220,6 @@ export default function App() {
                 <div className="flex items-center gap-2 text-indigo-400 text-sm font-bold tracking-widest uppercase mt-auto">Coming Soon <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
              </button>
            )}
-
-           {/* New: Hind Mushawarat Meeting Task */}
            {accessiblePortals.includes("hm_task") && (
              <button onClick={() => setCurrentView("hm_task")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-rose-500/20 shadow-[0_0_20px_rgba(244,63,94,0.1)] hover:shadow-[0_0_40px_rgba(244,63,94,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 rounded-full blur-2xl group-hover:bg-rose-500/20 transition-all"></div>
@@ -229,6 +227,17 @@ export default function App() {
                 <h2 className="text-xl font-bold text-white mb-2 tracking-wide">Hind Mushawarat Task</h2>
                 <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">Under Construction. Task tracking for Hind Mushawarat Meetings.</p>
                 <div className="flex items-center gap-2 text-rose-400 text-sm font-bold tracking-widest uppercase mt-auto">Coming Soon <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
+             </button>
+           )}
+           
+           {/* New: User Assign & Access */}
+           {accessiblePortals.includes("user_access") && (
+             <button onClick={() => setCurrentView("user_access")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-violet-500/20 shadow-[0_0_20px_rgba(139,92,246,0.1)] hover:shadow-[0_0_40px_rgba(139,92,246,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/10 rounded-full blur-2xl group-hover:bg-violet-500/20 transition-all"></div>
+                <div className="w-16 h-16 bg-violet-500/10 border border-violet-500/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><Key className="w-8 h-8 text-violet-400" /></div>
+                <h2 className="text-xl font-bold text-white mb-2 tracking-wide">User Assign & Access</h2>
+                <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">Under Construction. Manage system users, roles, and dashboard permissions.</p>
+                <div className="flex items-center gap-2 text-violet-400 text-sm font-bold tracking-widest uppercase mt-auto">Coming Soon <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
              </button>
            )}
 
