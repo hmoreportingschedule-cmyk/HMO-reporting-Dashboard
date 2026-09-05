@@ -122,7 +122,7 @@ export default function App() {
               </div>
             </div>
             <button type="submit" disabled={isAuthenticating} className="w-full py-4 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all duration-300 transform active:scale-[0.98] flex justify-center items-center gap-3 mt-8 border border-white/10">
-              {isAuthenticating ? <><Loader2 className="w-5 h-5 animate-spin" /> AUTHENTICATING...</> : <><ArrowRight className="w-5 h-5" /> INITIALIZE ACCESS</>}
+              {isAuthenticating ? <><Loader2 className="w-5 h-5 animate-spin" /> AUTHENTICATING...</> : <><ArrowRight className="w-5 h-5" /> Login</>}
             </button>
           </form>
         </div>
