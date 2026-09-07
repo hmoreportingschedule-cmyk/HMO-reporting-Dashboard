@@ -375,27 +375,45 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
             </div>
           </div>
 
+          {/* Charts Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 h-[320px] flex flex-col">
-               <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-4">REPORTS BY REGION</h3>
-               <div className="flex-1 flex items-end gap-2 pb-2">
-                 {regionData.length > 0 ? regionData.slice(0, 8).map((d, i) => {
-                    const h = maxRegionCount ? (d.count / maxRegionCount) * 100 : 0;
-                    return (
-                      <div key={i} className="flex-1 flex flex-col justify-end items-center group relative h-full">
-                         <div className="opacity-0 group-hover:opacity-100 absolute -top-8 bg-white border border-teal-200 text-teal-700 text-[10px] px-2 py-1 rounded shadow-lg transition-opacity whitespace-nowrap z-10 pointer-events-none">
-                           {d.count.toLocaleString("en-IN")}
-                         </div>
-                         <div style={{height: `${Math.max(h, 2)}%`}} className="w-full bg-[#21496b] group-hover:bg-[#1e40af] rounded-t-sm transition-all" />
-                         <span className="text-[9px] text-slate-600 mt-2 truncate w-full text-center px-1" title={d.label}>{d.label}</span>
+             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 h-[340px] flex flex-col">
+                <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-4">REPORTS BY REGION</h3>
+                <div className="flex-1 flex w-full pt-2">
+                  {regionData.length > 0 ? (
+                    <>
+                      {/* Y-Axis Column */}
+                      <div className="flex flex-col justify-between items-end pr-3 border-r border-slate-300 pb-8 text-[10px] font-bold text-slate-500 w-12 shrink-0">
+                        <span>{maxRegionCount.toLocaleString("en-IN")}</span>
+                        <span>{Math.round(maxRegionCount / 2).toLocaleString("en-IN")}</span>
+                        <span>0</span>
                       </div>
-                    )
-                 }) : <div className="w-full text-center text-slate-500 text-xs my-auto">No data</div>}
-               </div>
-            </div>
-            <MiniTable title="REPORTS BY STATE" data={groupCount(filteredRows, "state")} />
-            <MiniTable title="REPORTS BY DEPARTMENT" data={groupCount(filteredRows, "department")} />
-            <MiniTable title="REPORTS BY DIVISION" data={groupCount(filteredRows, "division")} />
+                      {/* Chart Area */}
+                      <div className="flex-1 flex items-end gap-2 pl-3 pb-8 relative border-b border-slate-300">
+                        {regionData.slice(0, 8).map((d, i) => {
+                           const h = maxRegionCount ? (d.count / maxRegionCount) * 100 : 0;
+                           // Top 1: Green, Top 2: Blue, Top 3: Purple, Top 4+: Orange
+                           const bgColor = i === 0 ? "bg-emerald-500" : i === 1 ? "bg-blue-500" : i === 2 ? "bg-purple-500" : "bg-orange-500";
+                           return (
+                             <div key={i} className="flex-1 flex flex-col justify-end items-center relative h-full">
+                                {/* Value on Top */}
+                                <span className="text-[11px] font-bold text-slate-800 mb-1.5">{d.count.toLocaleString("en-IN")}</span>
+                                {/* Tower/Bar */}
+                                <div style={{height: `${Math.max(h, 2)}%`}} className={`w-full ${bgColor} rounded-t-sm transition-all hover:opacity-80`} />
+                                {/* X-Axis Label */}
+                                <span className="absolute -bottom-7 w-full text-center text-[9px] text-slate-600 truncate px-1 font-medium">{d.label}</span>
+                             </div>
+                           )
+                        })}
+                      </div>
+                    </>
+                  ) : <div className="w-full text-center text-slate-400 text-xs my-auto font-medium">No data available to display</div>}
+                </div>
+             </div>
+             
+             <MiniTable title="REPORTS BY STATE" data={groupCount(filteredRows, "state")} />
+             <MiniTable title="REPORTS BY DEPARTMENT" data={groupCount(filteredRows, "department")} />
+             <MiniTable title="REPORTS BY DIVISION" data={groupCount(filteredRows, "division")} />
           </div>
 
           {/* Optimized Table Section */}
