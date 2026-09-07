@@ -281,6 +281,7 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
             </div>
             <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
               <div className="col-span-2 md:col-span-1">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Search</label>
                 <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full p-3 rounded-xl border border-slate-700/50 bg-[#0a0f1c] text-sm font-medium text-slate-300 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50" />
               </div>
               {[
