@@ -1,9 +1,10 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
 import Papa from "papaparse";
-import { ArrowLeft, BookOpenCheck, LogOut, RefreshCw, Download, Presentation, FileText, Clock, LayoutDashboard, Activity, Filter, Search } from "lucide-react";
+import { ArrowLeft, BookOpenCheck, LogOut, RefreshCw, Download, Presentation, FileText, Clock, LayoutDashboard, Activity, Filter, Search, Image as ImageIcon } from "lucide-react";
 import pptxgen from "pptxgenjs";
 import * as XLSX from "xlsx";
+import html2canvas from "html2canvas";
 
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyF74lC0dNiWUalx0G7GEK3F802IMBMXfuCsqfuCi5-QYuGkOh-85R_BzK9U_O9mfkpUA/exec";
 const DEFAULT_CSV_URL = "https://docs.google.com/spreadsheets/d/1GfMa7j1TIx17jG0g25tdEwU2YgHCm9_fbcrWIUTrSeI/gviz/tq?tqx=out:csv&sheet=Responses";
@@ -51,7 +52,7 @@ const MiniTable = ({ title, data }) => (
 );
 
 export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) {
-  const [config, setConfig] = useState({ officeStatus: "ON", risalaName: "Loading...", offMessage: "Loading...", risalaNo: "" });
+  const [config, setConfig] = useState({ officeStatus: "ON", b1Value: "", b2Value: "", offMessage: "", risalaNo: "" });
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
   const [dashboardData, setDashboardData] = useState({ totalRows: 0 });
   const [rows, setRows] = useState([]);
@@ -83,7 +84,8 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
       if (data.status === "Success") {
         setConfig({
           officeStatus: String(data.officeStatus).toUpperCase().trim() || "OFF",
-          risalaName: data.risalaName || "N/A",
+          b1Value: data.b1Value || "",
+          b2Value: data.b2Value || "",
           offMessage: data.offMessage || "Dashboard is closed.",
           risalaNo: data.risalaNo || ""
         });
@@ -95,12 +97,12 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
           setLoading(false);
         }
       } else {
-        setConfig({ officeStatus: "ON", risalaName: "Weekly Risala Report", offMessage: "", risalaNo: "" });
+        setConfig({ officeStatus: "ON", b1Value: "", b2Value: "", offMessage: "", risalaNo: "" });
         setIsConfigLoaded(true);
         fetchData();
       }
     } catch(e) {
-      setConfig({ officeStatus: "ON", risalaName: "Weekly Risala Report", offMessage: "", risalaNo: "" });
+      setConfig({ officeStatus: "ON", b1Value: "", b2Value: "", offMessage: "", risalaNo: "" });
       setIsConfigLoaded(true);
       fetchData();
     }
@@ -195,6 +197,15 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
     }, 0);
   }, [filteredRows]);
 
+  const { dynamicGraphData, dynamicGraphTitle } = useMemo(() => {
+    if (division) return { dynamicGraphData: groupCount(filteredRows, "district"), dynamicGraphTitle: "REPORTS BY DISTRICT" };
+    if (state) return { dynamicGraphData: groupCount(filteredRows, "division"), dynamicGraphTitle: "REPORTS BY DIVISION" };
+    if (region) return { dynamicGraphData: groupCount(filteredRows, "state"), dynamicGraphTitle: "REPORTS BY STATE" };
+    return { dynamicGraphData: groupCount(filteredRows, "region"), dynamicGraphTitle: "REPORTS BY REGION" };
+  }, [filteredRows, region, state, division]);
+
+  const maxDynamicCount = dynamicGraphData.length ? Math.max(...dynamicGraphData.map(d => d.count)) : 0;
+
   const downloadPPT = () => {
     if (!filteredRows.length) return alert("No data to export");
     let pres = new pptxgen();
@@ -214,12 +225,11 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
     slide2.addText("REPORT QUANTITY", { x: 5.5, y: 1.8, w: 3.5, fontSize: 14, color: "64748b", align: "center" });
     slide2.addText(totalReportSum.toLocaleString("en-IN"), { x: 5.5, y: 2.3, w: 3.5, fontSize: 32, bold: true, color: "0f766e", align: "center" });
 
-    const regionDataPPT = groupCount(filteredRows, "region");
-    if (regionDataPPT.length > 0) {
+    if (dynamicGraphData.length > 0) {
         let slide3 = pres.addSlide();
         slide3.background = { color: "ffffff" };
-        slide3.addText("Reports by Region", { x: 0.5, y: 0.5, w: 9, fontSize: 24, bold: true, color: "0f766e" });
-        let chartData = [{ name: "Reports", labels: regionDataPPT.slice(0, 8).map(d => d.label || "Unknown"), values: regionDataPPT.slice(0, 8).map(d => d.count) }];
+        slide3.addText(dynamicGraphTitle, { x: 0.5, y: 0.5, w: 9, fontSize: 24, bold: true, color: "0f766e" });
+        let chartData = [{ name: "Reports", labels: dynamicGraphData.slice(0, 8).map(d => d.label || "Unknown"), values: dynamicGraphData.slice(0, 8).map(d => d.count) }];
         slide3.addChart(pres.ChartType.bar, chartData, { x: 0.5, y: 1.2, w: 9, h: 3.5, barDir: "col", chartColors: ["008080"], valAxisLabelColor: "475569", catAxisLabelColor: "475569", showLegend: false });
     }
     pres.writeFile({ fileName: `Weekly_Risala_PPT_${new Date().getTime()}.pptx` });
@@ -247,8 +257,25 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
     XLSX.writeFile(workbook, `Weekly_Risala_RawData_${new Date().getTime()}.xlsx`);
   };
 
-  const regionData = groupCount(filteredRows, "region");
-  const maxRegionCount = regionData.length ? Math.max(...regionData.map(d => d.count)) : 0;
+  const downloadJPEG = async () => {
+    const element = document.getElementById("report-card-view");
+    if (!element) return;
+    try {
+        const canvas = await html2canvas(element, { 
+            scale: 2, 
+            backgroundColor: "#e0f2f1", 
+            useCORS: true,
+            ignoreElements: (node) => node.hasAttribute("data-html2canvas-ignore")
+        });
+        const link = document.createElement('a');
+        link.download = `Risala_Report_Card_${new Date().getTime()}.jpg`;
+        link.href = canvas.toDataURL('image/jpeg', 0.9);
+        link.click();
+    } catch (err) {
+        console.error("Failed to capture image", err);
+        alert("Image download failed.");
+    }
+  };
 
   if (isConfigLoaded && config.officeStatus === "OFF") {
     return (
@@ -271,154 +298,166 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
       </div>
 
       <div className="relative z-10">
-        <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between py-4 gap-4">
-            <div className="flex items-center gap-4 w-full md:w-auto">
-              <button onClick={onBack} className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-lg shadow-sm transition-colors">
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div className="p-2.5 bg-teal-700 text-white rounded-lg shadow-sm border border-teal-700 hidden sm:block">
-                <BookOpenCheck className="w-6 h-6" />
+        {/* REPORT CARD VIEW CONTAINER */}
+        <div id="report-card-view" className="bg-[#e0f2f1] pb-6 pt-4">
+            <header className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 relative z-30">
+              <div className="bg-white border border-slate-200 shadow-sm rounded-2xl px-6 py-5 flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-4 w-full md:w-auto">
+                  <button data-html2canvas-ignore="true" onClick={onBack} className="p-3 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-xl shadow-sm transition-colors">
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
+                  <div className="p-3 bg-teal-700 text-white rounded-xl shadow-sm border border-teal-700 hidden sm:block">
+                    <BookOpenCheck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-wide">WEEKLY RISALA <span className="font-light text-teal-700">REPORT</span></h1>
+                    {(config.b1Value || config.b2Value) ? (
+                        <p className="text-xs font-bold text-teal-700 uppercase tracking-widest mt-1">
+                            {config.b1Value} {config.b1Value && config.b2Value && <span className="text-slate-400 mx-1">:</span>} {config.b2Value}
+                        </p>
+                    ) : (
+                        <p className="text-[10px] font-bold text-teal-700 uppercase tracking-widest mt-0.5">Live Data Synchronization</p>
+                    )}
+                  </div>
+                </div>
+                
+                <div data-html2canvas-ignore="true" className="flex flex-wrap items-center justify-center md:justify-end gap-3 w-full md:w-auto">
+                  <div className="text-[10px] font-bold text-slate-600 uppercase tracking-widest bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 hidden lg:block">
+                    User: <span className="text-teal-700">{officeUser?.name || officeUser?.userId || "Admin"}</span>
+                  </div>
+                  <button onClick={() => fetchData()} disabled={loading} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-lg border border-teal-600 transition-all active:scale-95">
+                    <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> <span className="hidden sm:inline">Sync</span>
+                  </button>
+                  <button onClick={downloadJPEG} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#0f766e] hover:bg-[#115e59] text-white px-4 py-2.5 rounded-lg border border-[#0f766e] transition-all active:scale-95 shadow-md">
+                    <ImageIcon className="w-4 h-4" /> <span className="hidden sm:inline">JPEG</span>
+                  </button>
+                  <button onClick={downloadPPT} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-lg border border-teal-600 transition-all active:scale-95">
+                    <Presentation className="w-4 h-4" /> <span className="hidden sm:inline">PPT</span>
+                  </button>
+                  <button onClick={downloadExcel} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#198754] hover:bg-green-700 text-white px-4 py-2.5 rounded-lg border border-[#198754] transition-all active:scale-95">
+                    <Download className="w-4 h-4" /> <span className="hidden sm:inline">Excel</span>
+                  </button>
+                  <button onClick={onLogout} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#dc3545] hover:bg-red-700 text-white px-4 py-2.5 rounded-lg border border-[#dc3545] transition-all active:scale-95">
+                    <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Logout</span>
+                  </button>
+                </div>
               </div>
-              <div>
-                <h1 className="text-lg sm:text-xl font-bold text-slate-800 tracking-wide">WEEKLY RISALA <span className="font-light text-teal-700">REPORT</span></h1>
-                <p className="text-[10px] font-bold text-teal-700 uppercase tracking-widest mt-0.5">{dashboardData.b4Value}</p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center justify-center md:justify-end gap-3 w-full md:w-auto">
-              <div className="text-[10px] font-bold text-slate-600 uppercase tracking-widest bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 hidden lg:block">
-                User: <span className="text-teal-700">{officeUser?.name || officeUser?.userId || "Admin"}</span>
-              </div>
-              <button onClick={() => fetchData()} disabled={loading} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-lg border border-teal-600 transition-all active:scale-95">
-                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> <span className="hidden sm:inline">Sync</span>
-              </button>
-              <button onClick={downloadPPT} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-lg border border-teal-600 transition-all active:scale-95">
-                <Presentation className="w-4 h-4" /> <span className="hidden sm:inline">PPT</span>
-              </button>
-              <button onClick={downloadExcel} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#198754] hover:bg-green-700 text-white px-4 py-2.5 rounded-lg border border-[#198754] transition-all active:scale-95">
-                <Download className="w-4 h-4" /> <span className="hidden sm:inline">Excel</span>
-              </button>
-              <button onClick={onLogout} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#dc3545] hover:bg-red-700 text-white px-4 py-2.5 rounded-lg border border-[#dc3545] transition-all active:scale-95">
-                <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Logout</span>
-              </button>
-            </div>
-          </div>
-        </header>
+            </header>
 
-        <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-          
-          {fetchError && (
-            <div className="p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-medium flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-red-500 animate-ping"></div>
-              {fetchError}
-            </div>
-          )}
+            <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+              {fetchError && (
+                <div data-html2canvas-ignore="true" className="p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-medium flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-red-500 animate-ping"></div>
+                  {fetchError}
+                </div>
+              )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
-              <div className="relative flex justify-between items-center z-10">
-                <div className="flex items-center gap-4">
-                    <div className="p-3.5 rounded-lg bg-amber-50 text-amber-500 border border-amber-100">
-                      <LayoutDashboard className="w-6 h-6" />
+              {/* KPIs */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
+                  <div className="relative flex justify-between items-center z-10">
+                    <div className="flex items-center gap-4">
+                        <div className="p-4 rounded-xl bg-amber-50 text-amber-500 border border-amber-100">
+                          <LayoutDashboard className="w-7 h-7" />
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">TOTAL SUBMITTED</p>
+                            <h3 className="text-5xl font-black text-teal-800 tracking-tight">{filteredRows.length.toLocaleString("en-IN")}</h3>
+                        </div>
                     </div>
-                    <div>
-                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1">TOTAL SUBMITTED</p>
-                        <h3 className="text-4xl font-extrabold text-teal-700 tracking-tight">{filteredRows.length.toLocaleString("en-IN")}</h3>
+                  </div>
+                </div>
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
+                  <div className="relative flex justify-between items-center z-10">
+                    <div className="flex items-center gap-4">
+                        <div className="p-4 rounded-xl bg-teal-50 text-teal-500 border border-teal-100">
+                          <Activity className="w-7 h-7" />
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">REPORT QUANTITY</p>
+                            <h3 className="text-5xl font-black text-teal-800 tracking-tight">{totalReportSum.toLocaleString("en-IN")}</h3>
+                        </div>
                     </div>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
-              <div className="relative flex justify-between items-center z-10">
-                <div className="flex items-center gap-4">
-                    <div className="p-3.5 rounded-lg bg-teal-50 text-teal-500 border border-teal-100">
-                      <Activity className="w-6 h-6" />
+
+              {/* Filters */}
+              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-3 mb-6">
+                  <Filter className="w-5 h-5 text-teal-700" />
+                  <h2 className="text-sm font-bold text-slate-800 tracking-widest uppercase">Data Parameters</h2>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
+                  <div className="col-span-2 md:col-span-1" data-html2canvas-ignore="true">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Search</label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><Search className="w-4 h-4" /></span>
+                      <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500" />
                     </div>
-                    <div>
-                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1">REPORT QUANTITY</p>
-                        <h3 className="text-4xl font-extrabold text-teal-700 tracking-tight">{totalReportSum.toLocaleString("en-IN")}</h3>
+                  </div>
+                  {[
+                    { label: "Region", val: region, set: handleSetRegion, opts: uniqValues(rows, "region") },
+                    { label: "State", val: state, set: handleSetState, opts: uniqValues(rows.filter(x=>!region||sameClient(x.region,region)), "state") },
+                    { label: "Division", val: division, set: handleSetDivision, opts: uniqValues(rows.filter(x=>(!region||sameClient(x.region,region))&&(!state||sameClient(x.state,state))), "division") },
+                    { label: "District", val: district, set: setDistrict, opts: uniqValues(rows.filter(x=>(!region||sameClient(x.region,region))&&(!state||sameClient(x.state,state))&&(!division||sameClient(x.division,division))), "district") },
+                    { label: "Department", val: department, set: setDepartment, opts: uniqValues(rows, "department") },
+                    { label: "Chain", val: chain, set: setChain, opts: uniqValues(rows, "chain") }
+                  ].map((f, i) => (
+                    <div key={i} className="flex flex-col flex-1 min-w-[130px]">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{f.label}</label>
+                      <select value={f.val} onChange={(e) => f.set(e.target.value)} disabled={officeUser?.[f.label.toLowerCase()] && officeUser[f.label.toLowerCase()].toLowerCase() !== "all"} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer disabled:bg-slate-50 disabled:text-slate-400">
+                        <option value="">{f.val || "All"}</option>
+                        {f.opts.map(o => <option key={o} value={o}>{o}</option>)}
+                      </select>
                     </div>
+                  ))}
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-            <div className="flex items-center gap-3 mb-6">
-              <Filter className="w-5 h-5 text-teal-700" />
-              <h2 className="text-sm font-bold text-slate-800 tracking-widest uppercase">Data Parameters</h2>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
-              <div className="col-span-2 md:col-span-1">
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Search</label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><Search className="w-4 h-4" /></span>
-                  <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500" />
-                </div>
+              {/* Charts Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 h-[340px] flex flex-col">
+                    <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-4">{dynamicGraphTitle}</h3>
+                    <div className="flex-1 flex w-full pt-2">
+                      {dynamicGraphData.length > 0 ? (
+                        <>
+                          {/* Y-Axis Column */}
+                          <div className="flex flex-col justify-between items-end pr-3 border-r border-slate-300 pb-8 text-[10px] font-bold text-slate-500 w-12 shrink-0">
+                            <span>{maxDynamicCount.toLocaleString("en-IN")}</span>
+                            <span>{Math.round(maxDynamicCount / 2).toLocaleString("en-IN")}</span>
+                            <span>0</span>
+                          </div>
+                          {/* Chart Area */}
+                          <div className="flex-1 flex justify-start items-end gap-4 sm:gap-6 pl-4 pb-8 relative border-b border-slate-300 overflow-x-auto custom-scrollbar">
+                            {dynamicGraphData.slice(0, 10).map((d, i) => {
+                               const h = maxDynamicCount ? (d.count / maxDynamicCount) * 100 : 0;
+                               const bgColor = i === 0 ? "bg-[#064e3b]" : i === 1 ? "bg-[#1e3a8a]" : i === 2 ? "bg-[#581c87]" : "bg-[#9a3412]";
+                               return (
+                                 <div key={i} className="flex flex-col justify-end items-center relative h-full w-10 sm:w-14 shrink-0">
+                                    <span className="text-[11px] font-bold text-slate-800 mb-1.5">{d.count.toLocaleString("en-IN")}</span>
+                                    <div style={{height: `${Math.max(h, 2)}%`}} className={`w-8 sm:w-12 ${bgColor} rounded-t-md transition-all hover:opacity-80`} />
+                                    <span className="absolute -bottom-7 w-20 text-center text-[9px] text-slate-600 truncate px-1 font-medium">{d.label}</span>
+                                 </div>
+                               )
+                            })}
+                          </div>
+                        </>
+                      ) : <div className="w-full text-center text-slate-400 text-xs my-auto font-medium">No data available to display</div>}
+                    </div>
+                 </div>
+                 
+                 <MiniTable title="REPORTS BY STATE" data={groupCount(filteredRows, "state")} />
+                 <MiniTable title="REPORTS BY DEPARTMENT" data={groupCount(filteredRows, "department")} />
+                 <MiniTable title="REPORTS BY DIVISION" data={groupCount(filteredRows, "division")} />
               </div>
-              {[
-                { label: "Region", val: region, set: handleSetRegion, opts: uniqValues(rows, "region") },
-                { label: "State", val: state, set: handleSetState, opts: uniqValues(rows.filter(x=>!region||sameClient(x.region,region)), "state") },
-                { label: "Division", val: division, set: handleSetDivision, opts: uniqValues(rows.filter(x=>(!region||sameClient(x.region,region))&&(!state||sameClient(x.state,state))), "division") },
-                { label: "District", val: district, set: setDistrict, opts: uniqValues(rows.filter(x=>(!region||sameClient(x.region,region))&&(!state||sameClient(x.state,state))&&(!division||sameClient(x.division,division))), "district") },
-                { label: "Department", val: department, set: setDepartment, opts: uniqValues(rows, "department") },
-                { label: "Chain", val: chain, set: setChain, opts: uniqValues(rows, "chain") }
-              ].map((f, i) => (
-                <div key={i} className="flex flex-col flex-1 min-w-[130px]">
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{f.label}</label>
-                  <select value={f.val} onChange={(e) => f.set(e.target.value)} disabled={officeUser?.[f.label.toLowerCase()] && officeUser[f.label.toLowerCase()].toLowerCase() !== "all"} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer disabled:bg-slate-50 disabled:text-slate-400">
-                    <option value="">{f.label}</option>
-                    {f.opts.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </div>
-              ))}
-            </div>
-          </div>
+            </main>
+        </div> {/* END OF REPORT CARD VIEW */}
 
-          {/* Charts Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 h-[340px] flex flex-col">
-                <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-4">REPORTS BY REGION</h3>
-                <div className="flex-1 flex w-full pt-2">
-                  {regionData.length > 0 ? (
-                    <>
-                      {/* Y-Axis Column */}
-                      <div className="flex flex-col justify-between items-end pr-3 border-r border-slate-300 pb-8 text-[10px] font-bold text-slate-500 w-12 shrink-0">
-                        <span>{maxRegionCount.toLocaleString("en-IN")}</span>
-                        <span>{Math.round(maxRegionCount / 2).toLocaleString("en-IN")}</span>
-                        <span>0</span>
-                      </div>
-                      {/* Chart Area */}
-                      <div className="flex-1 flex justify-center items-end gap-3 sm:gap-6 md:gap-8 pl-3 pb-8 relative border-b border-slate-300">
-                        {regionData.slice(0, 8).map((d, i) => {
-                           const h = maxRegionCount ? (d.count / maxRegionCount) * 100 : 0;
-                           // Dark colors
-                           const bgColor = i === 0 ? "bg-[#064e3b]" : i === 1 ? "bg-[#1e3a8a]" : i === 2 ? "bg-[#581c87]" : "bg-[#9a3412]";
-                           return (
-                             <div key={i} className="flex flex-col justify-end items-center relative h-full w-12 sm:w-16">
-                                {/* Value on Top */}
-                                <span className="text-[11px] font-bold text-slate-800 mb-1.5">{d.count.toLocaleString("en-IN")}</span>
-                                {/* Tower/Bar - thinner */}
-                                <div style={{height: `${Math.max(h, 2)}%`}} className={`w-6 sm:w-8 md:w-10 ${bgColor} rounded-t-md transition-all hover:opacity-80`} />
-                                {/* X-Axis Label */}
-                                <span className="absolute -bottom-7 w-20 text-center text-[9px] text-slate-600 truncate px-1 font-medium">{d.label}</span>
-                             </div>
-                           )
-                        })}
-                      </div>
-                    </>
-                  ) : <div className="w-full text-center text-slate-400 text-xs my-auto font-medium">No data available to display</div>}
-                </div>
-             </div>
-             
-             <MiniTable title="REPORTS BY STATE" data={groupCount(filteredRows, "state")} />
-             <MiniTable title="REPORTS BY DEPARTMENT" data={groupCount(filteredRows, "department")} />
-             <MiniTable title="REPORTS BY DIVISION" data={groupCount(filteredRows, "division")} />
-          </div>
-
-          {/* Optimized Table Section */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm mt-6">
-            <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 bg-[#e0f2f1] rounded-t-xl">
+        <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pb-8 mt-2">
+          {/* Optimized Table Section - Excluded from JPEG */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+            <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50 rounded-t-xl">
               <div>
                 <h2 className="text-sm font-bold text-teal-800 uppercase tracking-widest">Detailed Telemetry Output</h2>
                 <p className="text-[10px] text-slate-600 mt-1 uppercase tracking-widest">Source: {dashboardData.totalRows} &bull; Visible: {filteredRows.length}</p>
