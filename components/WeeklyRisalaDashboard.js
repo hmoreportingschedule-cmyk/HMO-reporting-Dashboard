@@ -393,13 +393,13 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
                         {regionData.slice(0, 8).map((d, i) => {
                            const h = maxRegionCount ? (d.count / maxRegionCount) * 100 : 0;
                            // Top 1: Green, Top 2: Blue, Top 3: Purple, Top 4+: Orange
-                           const bgColor = i === 0 ? "bg-emerald-500" : i === 1 ? "bg-blue-500" : i === 2 ? "bg-purple-500" : "bg-orange-500";
+                           const bgColor = i === 0 ? "bg-emerald-700" : i === 1 ? "bg-blue-800" : i === 2 ? "bg-purple-800" : "bg-orange-700";
                            return (
                              <div key={i} className="flex-1 flex flex-col justify-end items-center relative h-full">
                                 {/* Value on Top */}
                                 <span className="text-[11px] font-bold text-slate-800 mb-1.5">{d.count.toLocaleString("en-IN")}</span>
                                 {/* Tower/Bar */}
-                                <div style={{height: `${Math.max(h, 2)}%`}} className={`w-full ${bgColor} rounded-t-sm transition-all hover:opacity-80`} />
+                                <div style={{height: `${Math.max(h, 2)}%`}} className={`w-10 sm:w-12 md:w-16 ${bgColor} rounded-t-md transition-all hover:opacity-80`} />
                                 {/* X-Axis Label */}
                                 <span className="absolute -bottom-7 w-full text-center text-[9px] text-slate-600 truncate px-1 font-medium">{d.label}</span>
                              </div>
