@@ -52,13 +52,11 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
           setLoading(false);
         }
       } else {
-        // Fallback if script not updated yet
         setConfig({ officeStatus: "ON", risalaName: "Weekly Risala Report", offMessage: "", risalaNo: "" });
         setIsConfigLoaded(true);
         fetchData();
       }
     } catch(e) {
-      // Fallback on network error for config
       setConfig({ officeStatus: "ON", risalaName: "Weekly Risala Report", offMessage: "", risalaNo: "" });
       setIsConfigLoaded(true);
       fetchData();
@@ -286,7 +284,7 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
                       {config.risalaNo && <span className="border border-teal-600 text-teal-700 font-bold px-3 py-1.5 rounded-lg text-sm bg-teal-50">{config.risalaNo}</span>}
                       <span className="text-teal-700 font-bold text-sm">Date: {new Date().toLocaleDateString('en-GB')} | Time: {new Date().toLocaleTimeString('en-GB')}</span>
                       <button onClick={onLogout} className="bg-[#dc3545] hover:bg-red-700 text-white font-bold py-1.5 px-4 rounded transition-colors text-sm shadow-sm flex items-center gap-1">
-                         Logout
+                         <LogOut className="w-4 h-4" /> Logout
                       </button>
                    </div>
                    <div className="flex flex-wrap items-center gap-3 mt-1">
@@ -321,7 +319,7 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
              <div className="bg-white rounded-xl shadow-sm p-6 border-l-[6px] border-teal-600 flex justify-between items-center transition-all hover:shadow-md">
                 <div className="flex items-center gap-3">
                    <Clock className="text-teal-500 w-6 h-6" />
-                   <span className="text-slate-700 font-bold text-xs uppercase tracking-wider">Report</span>
+                   <span className="text-slate-700 font-bold text-xs uppercase tracking-wider">Report Quantity</span>
                 </div>
                 <span className="text-teal-700 font-extrabold text-4xl">{totalReportSum.toLocaleString("en-IN")}</span>
              </div>
@@ -330,6 +328,7 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
           {/* Filters */}
           <div className="bg-white rounded-xl shadow-sm p-5 flex flex-wrap items-end gap-4 border border-slate-200">
              <div className="flex flex-col flex-1 min-w-[150px]">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Search</label>
                 <input type="text" placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-slate-700 placeholder-slate-400 w-full transition-all" />
              </div>
              {[
@@ -341,6 +340,7 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
                { label: "Chain", val: chain, set: setChain, opts: uniqValues(rows, "chain") }
              ].map((f, i) => (
                <div key={i} className="flex flex-col flex-1 min-w-[130px]">
+                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{f.label}</label>
                  <select value={f.val} onChange={(e) => f.set(e.target.value)} disabled={officeUser?.[f.label.toLowerCase()] && officeUser[f.label.toLowerCase()].toLowerCase() !== "all"} className="border border-slate-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-slate-700 bg-white disabled:bg-slate-100 disabled:text-slate-400 transition-all cursor-pointer">
                    <option value="">{f.label}</option>
                    {f.opts.map(o => <option key={o} value={o}>{o}</option>)}
