@@ -268,8 +268,6 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
   return (
     <div className="min-h-screen bg-[#e0f2f1] text-slate-800 font-sans p-4 sm:p-6 lg:p-8">
        <div className="max-w-[1400px] mx-auto space-y-6">
-          
-          {/* Top Header */}
           <div className="bg-white rounded-xl shadow-sm p-5 border-t-[6px] border-teal-600 flex flex-col gap-4">
              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
@@ -308,7 +306,6 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
 
           {fetchError && <div className="p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-bold flex items-center gap-3 shadow-sm"><div className="w-2 h-2 rounded-full bg-red-500 animate-ping"></div>{fetchError}</div>}
 
-          {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
              <div className="bg-white rounded-xl shadow-sm p-6 border-l-[6px] border-teal-600 flex justify-between items-center transition-all hover:shadow-md">
                 <div className="flex items-center gap-3">
@@ -326,7 +323,6 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
              </div>
           </div>
 
-          {/* Filters */}
           <div className="bg-white rounded-xl shadow-sm p-5 flex flex-wrap items-end gap-4 border border-slate-200">
              <div className="flex flex-col flex-1 min-w-[150px]">
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Search</label>
@@ -350,7 +346,6 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
              ))}
           </div>
 
-          {/* Charts Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col h-[320px]">
                 <h3 className="text-teal-700 font-bold uppercase tracking-widest text-sm mb-6 border-b border-slate-100 pb-3">REPORTS BY REGION</h3>
@@ -373,7 +368,6 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
              <MiniTable title="REPORTS BY DIVISION" data={groupCount(filteredRows, "division")} />
           </div>
 
-          {/* Main Table */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mt-6">
              <div className="bg-[#e0f2f1] border-b border-slate-200 p-4 flex flex-col md:flex-row justify-between items-center gap-4">
                 <span className="text-teal-800 text-xs font-bold uppercase tracking-wider">
