@@ -6,7 +6,8 @@ import pptxgen from "pptxgenjs";
 import * as XLSX from "xlsx";
 
 export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) {
-  const [sheetUrl, setSheetUrl] = useState("");
+  const DEFAULT_CSV_URL = "https://docs.google.com/spreadsheets/d/1GfMa7j1TIx17jG0g25tdEwU2YgHCm9_fbcrWIUTrSeI/gviz/tq?tqx=out:csv&sheet=Responses";
+  const [sheetUrl, setSheetUrl] = useState(DEFAULT_CSV_URL);
   const [dashboardData, setDashboardData] = useState({ b4Value: "Live CSV Sync", b6Value: "Online", totalRows: 0 });
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -24,11 +25,8 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
   const rowsPerPage = 10;
 
   useEffect(() => {
-    const savedUrl = localStorage.getItem("risala_csv_url");
-    if (savedUrl) {
-      setSheetUrl(savedUrl);
-      fetchData(savedUrl);
-    }
+    // Auto sync from the provided Google Sheet
+    fetchData(DEFAULT_CSV_URL);
   }, []);
 
   const fetchData = async (urlToFetch) => {
