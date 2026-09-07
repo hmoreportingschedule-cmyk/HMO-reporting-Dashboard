@@ -8,6 +8,48 @@ import * as XLSX from "xlsx";
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyF74lC0dNiWUalx0G7GEK3F802IMBMXfuCsqfuCi5-QYuGkOh-85R_BzK9U_O9mfkpUA/exec";
 const DEFAULT_CSV_URL = "https://docs.google.com/spreadsheets/d/1GfMa7j1TIx17jG0g25tdEwU2YgHCm9_fbcrWIUTrSeI/gviz/tq?tqx=out:csv&sheet=Responses";
 
+const sameClient = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+
+const groupCount = (data, key) => {
+  const map = {};
+  data.forEach(x => {
+      const k = (x[key] || "Unknown").trim();
+      const n = Number(String(x.report || "").replace(/,/g, ""));
+      map[k] = (map[k] || 0) + (isNaN(n) ? 0 : n);
+  });
+  return Object.keys(map).sort((a,b) => map[b] - map[a]).map(k => ({ label: k, count: map[k] }));
+};
+
+const uniqValues = (data, key) => {
+  return [...new Set(data.map(x => String(x[key] || "").trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+};
+
+const MiniTable = ({ title, data }) => (
+  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[320px]">
+    <div className="p-4 border-b border-slate-100">
+      <h3 className="text-teal-700 font-bold uppercase tracking-widest text-sm">{title}</h3>
+    </div>
+    <div className="overflow-y-auto flex-1 custom-scrollbar">
+      <table className="w-full text-left text-sm">
+        <thead className="bg-teal-700 text-white sticky top-0 z-10">
+          <tr>
+            <th className="py-2.5 px-4 font-bold text-xs uppercase tracking-wider">Name</th>
+            <th className="py-2.5 px-4 font-bold text-xs uppercase tracking-wider text-right">Report Qty</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {data.length > 0 ? data.map((d, i) => (
+            <tr key={i} className="hover:bg-slate-50 transition-colors">
+              <td className="py-2.5 px-4 text-slate-700">{d.label}</td>
+              <td className="py-2.5 px-4 text-teal-700 font-bold text-right">{d.count.toLocaleString("en-IN")}</td>
+            </tr>
+          )) : <tr><td colSpan="2" className="text-center py-4 text-slate-500 text-xs">No data available</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
+
 export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) {
   const [config, setConfig] = useState({ officeStatus: "ON", risalaName: "Loading...", offMessage: "Loading...", risalaNo: "" });
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
@@ -29,7 +71,7 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
 
   useEffect(() => {
     loadConfigAndData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadConfigAndData = async () => {
@@ -126,8 +168,6 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
     if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
   };
 
-  const sameClient = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
-
   const filteredRows = useMemo(() => {
     let result = rows.filter(x =>
         (!region || sameClient(x.region, region)) &&
@@ -148,26 +188,12 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
     return filteredRows.slice(start, start + rowsPerPage);
   }, [filteredRows, currentPage]);
 
-  const groupCount = (data, key) => {
-    const map = {};
-    data.forEach(x => {
-        const k = (x[key] || "Unknown").trim();
-        const n = Number(String(x.report || "").replace(/,/g, ""));
-        map[k] = (map[k] || 0) + (isNaN(n) ? 0 : n);
-    });
-    return Object.keys(map).sort((a,b) => map[b] - map[a]).map(k => ({ label: k, count: map[k] }));
-  };
-
   const totalReportSum = useMemo(() => {
     return filteredRows.reduce((sum, x) => {
         const n = Number(String(x.report || "").replace(/,/g, ""));
         return sum + (isNaN(n) ? 0 : n);
     }, 0);
   }, [filteredRows]);
-
-  const uniqValues = (data, key) => {
-    return [...new Set(data.map(x => String(x[key] || "").trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b));
-  };
 
   const downloadPPT = () => {
     if (!filteredRows.length) return alert("No data to export");
@@ -222,32 +248,6 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
     XLSX.writeFile(workbook, `Weekly_Risala_RawData_${new Date().getTime()}.xlsx`);
   };
 
-  const MiniTable = ({ title, data }) => (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[320px]">
-      <div className="p-4 border-b border-slate-100">
-        <h3 className="text-teal-700 font-bold uppercase tracking-widest text-sm">{title}</h3>
-      </div>
-      <div className="overflow-y-auto flex-1 custom-scrollbar">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-teal-700 text-white sticky top-0 z-10">
-            <tr>
-              <th className="py-2.5 px-4 font-bold text-xs uppercase tracking-wider">Name</th>
-              <th className="py-2.5 px-4 font-bold text-xs uppercase tracking-wider text-right">Report Qty</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {data.length > 0 ? data.map((d, i) => (
-              <tr key={i} className="hover:bg-slate-50 transition-colors">
-                <td className="py-2.5 px-4 text-slate-700">{d.label}</td>
-                <td className="py-2.5 px-4 text-teal-700 font-bold text-right">{d.count.toLocaleString("en-IN")}</td>
-              </tr>
-            )) : <tr><td colSpan="2" className="text-center py-4 text-slate-500 text-xs">No data available</td></tr>}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-
   const regionData = groupCount(filteredRows, "region");
   const maxRegionCount = regionData.length ? Math.max(...regionData.map(d => d.count)) : 0;
 
@@ -285,7 +285,7 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
                       {config.risalaNo && <span className="border border-teal-600 text-teal-700 font-bold px-3 py-1.5 rounded-lg text-sm bg-teal-50">{config.risalaNo}</span>}
                       <span className="text-teal-700 font-bold text-sm">Date: {new Date().toLocaleDateString('en-GB')} | Time: {new Date().toLocaleTimeString('en-GB')}</span>
                       <button onClick={onLogout} className="bg-[#dc3545] hover:bg-red-700 text-white font-bold py-1.5 px-4 rounded transition-colors text-sm shadow-sm flex items-center gap-1">
-                         Logout
+                         <LogOut className="w-4 h-4" /> Logout
                       </button>
                    </div>
                    <div className="flex flex-wrap items-center gap-3 mt-1">
