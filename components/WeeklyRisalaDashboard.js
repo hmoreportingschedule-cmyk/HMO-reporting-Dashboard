@@ -1,6 +1,8 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, BookOpenCheck, LogOut, RefreshCw, Filter, Search, Activity, Download, LayoutDashboard, MapPin, Layers } from "lucide-react";
+import { ArrowLeft, BookOpenCheck, LogOut, RefreshCw, Filter, Search, Activity, Download, LayoutDashboard, MapPin, Layers, Presentation } from "lucide-react";
+import pptxgen from "pptxgenjs";
+import * as XLSX from "xlsx";
 
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwtCMnX7JgApy0BLFdhs7ByumM8H9JGjLLgDbYMBMpuQjtPHuzywoDesSz1lYZ-hYwE/exec";
 
@@ -11,12 +13,12 @@ export default function WeeklyRisalaDashboard({ onBack, token, officeUser, onLog
   const [fetchError, setFetchError] = useState("");
 
   const [search, setSearch] = useState("");
-  const [region, setRegion] = useState("");
-  const [state, setState] = useState("");
-  const [division, setDivision] = useState("");
-  const [district, setDistrict] = useState("");
-  const [department, setDepartment] = useState("");
-  const [chain, setChain] = useState("");
+  const [region, setRegion] = useState(officeUser?.region && officeUser.region.toLowerCase() !== "all" ? officeUser.region : "");
+  const [state, setState] = useState(officeUser?.state && officeUser.state.toLowerCase() !== "all" ? officeUser.state : "");
+  const [division, setDivision] = useState(officeUser?.division && officeUser.division.toLowerCase() !== "all" ? officeUser.division : "");
+  const [district, setDistrict] = useState(officeUser?.district && officeUser.district.toLowerCase() !== "all" ? officeUser.district : "");
+  const [department, setDepartment] = useState(officeUser?.department && officeUser.department.toLowerCase() !== "all" ? officeUser.department : "");
+  const [chain, setChain] = useState(officeUser?.chain && officeUser.chain.toLowerCase() !== "all" ? officeUser.chain : "");
 
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
@@ -91,20 +93,83 @@ export default function WeeklyRisalaDashboard({ onBack, token, officeUser, onLog
     return [...new Set(data.map(x => String(x[key] || "").trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b));
   };
 
-  const downloadCSV = () => {
+
+  const downloadPPT = () => {
     if (!filteredRows.length) return alert("No data to export");
-    const headers = ["Date/Time", "Name", "Contact Number", "Chain Type", "Nigran Level", "Zimmedar Level", "Department", "Risala Report", "Pincode", "District", "Division", "State", "Region", "Country"];
-    const csvRows = [headers.join(",")];
-    filteredRows.forEach(x => {
-        const row = [x.date, x.name, x.contact, x.chain, x.nigran||x.zimmedar||x.level, x.zimmedar, x.department, x.report, x.pincode, x.district, x.division, x.state, x.region, x.country];
-        csvRows.push(row.map(v => `"${(v||"").toString().replace(/"/g, '""')}"`).join(","));
-    });
-    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Weekly_Risala_Report.csv`;
-    a.click();
+    
+    let pres = new pptxgen();
+    
+    // Slide 1: Title
+    let slide1 = pres.addSlide();
+    slide1.background = { color: "0a0f1c" };
+    slide1.addText("WEEKLY RISALA REPORT", { x: 1, y: 2, w: 8, fontSize: 36, bold: true, color: "34d399", align: "center" });
+    slide1.addText(`User: ${officeUser?.name || officeUser?.userId || "Admin"}`, { x: 1, y: 3, w: 8, fontSize: 16, color: "94a3b8", align: "center" });
+    slide1.addText(`Generated on: ${new Date().toLocaleDateString()}`, { x: 1, y: 3.5, w: 8, fontSize: 12, color: "64748b", align: "center" });
+
+    // Slide 2: KPIs
+    let slide2 = pres.addSlide();
+    slide2.background = { color: "0a0f1c" };
+    slide2.addText("Key Performance Indicators", { x: 0.5, y: 0.5, w: 9, fontSize: 24, bold: true, color: "ffffff" });
+    
+    slide2.addShape(pres.ShapeType.rect, { x: 1, y: 1.5, w: 3.5, h: 2, fill: "121929", line: {color: "34d399", width: 1} });
+    slide2.addText("TOTAL SUBMITTED", { x: 1, y: 1.8, w: 3.5, fontSize: 14, color: "94a3b8", align: "center" });
+    slide2.addText(filteredRows.length.toLocaleString("en-IN"), { x: 1, y: 2.3, w: 3.5, fontSize: 32, bold: true, color: "ffffff", align: "center" });
+
+    slide2.addShape(pres.ShapeType.rect, { x: 5.5, y: 1.5, w: 3.5, h: 2, fill: "121929", line: {color: "34d399", width: 1} });
+    slide2.addText("REPORT QUANTITY", { x: 5.5, y: 1.8, w: 3.5, fontSize: 14, color: "94a3b8", align: "center" });
+    slide2.addText(totalReportSum.toLocaleString("en-IN"), { x: 5.5, y: 2.3, w: 3.5, fontSize: 32, bold: true, color: "34d399", align: "center" });
+
+    // Slide 3: Charts
+    const regionDataPPT = groupCount(filteredRows, "region");
+    if (regionDataPPT.length > 0) {
+        let slide3 = pres.addSlide();
+        slide3.background = { color: "0a0f1c" };
+        slide3.addText("Reports by Region", { x: 0.5, y: 0.5, w: 9, fontSize: 24, bold: true, color: "ffffff" });
+        
+        let chartData = [{
+            name: "Reports",
+            labels: regionDataPPT.slice(0, 8).map(d => d.label || "Unknown"),
+            values: regionDataPPT.slice(0, 8).map(d => d.count)
+        }];
+        
+        slide3.addChart(pres.ChartType.bar, chartData, {
+            x: 0.5, y: 1.2, w: 9, h: 3.5,
+            barDir: "col",
+            chartColors: ["34d399"],
+            valAxisLabelColor: "94a3b8",
+            catAxisLabelColor: "94a3b8",
+            showLegend: false
+        });
+    }
+
+    pres.writeFile({ fileName: `Weekly_Risala_PPT_${new Date().getTime()}.pptx` });
+  };
+
+  
+  const downloadExcel = () => {
+    if (!filteredRows.length) return alert("No data to export");
+    
+    // Map data nicely for Excel
+    const exportData = filteredRows.map(x => ({
+        "Date/Time": x.date || "",
+        "Name": x.name || "",
+        "Contact Number": x.contact || "",
+        "Chain Type": x.chain || "",
+        "Level": x.nigran || x.zimmedar || x.level || "",
+        "Department": x.department || "",
+        "Risala Report": x.report || "",
+        "Pincode": x.pincode || "",
+        "District": x.district || "",
+        "Division": x.division || "",
+        "State": x.state || "",
+        "Region": x.region || "",
+        "Country": x.country || ""
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Weekly Risala Data");
+    XLSX.writeFile(workbook, `Weekly_Risala_RawData_${new Date().getTime()}.xlsx`);
   };
 
   const MiniTable = ({ title, data }) => (
@@ -155,7 +220,10 @@ export default function WeeklyRisalaDashboard({ onBack, token, officeUser, onLog
               <button onClick={() => fetchDashboard(token)} disabled={loading} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#1a2333] hover:bg-[#222d42] text-emerald-400 px-4 py-2.5 rounded-xl border border-emerald-500/20 transition-all active:scale-95">
                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> <span className="hidden sm:inline">Sync</span>
               </button>
-              <button onClick={downloadCSV} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-900/30 hover:bg-teal-900/50 text-teal-400 px-4 py-2.5 rounded-xl border border-teal-500/30 transition-all active:scale-95">
+                            <button onClick={downloadPPT} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-400 px-4 py-2.5 rounded-xl border border-emerald-500/30 transition-all active:scale-95">
+                <Presentation className="w-4 h-4" /> <span className="hidden sm:inline">PPT</span>
+              </button>
+              <button onClick={downloadExcel} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-900/30 hover:bg-teal-900/50 text-teal-400 px-4 py-2.5 rounded-xl border border-teal-500/30 transition-all active:scale-95">
                 <Download className="w-4 h-4" /> <span className="hidden sm:inline">Excel</span>
               </button>
               <button onClick={onLogout} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-red-500/10 hover:bg-red-500/20 text-red-400 px-4 py-2.5 rounded-xl border border-red-500/20 transition-all active:scale-95">
@@ -214,7 +282,7 @@ export default function WeeklyRisalaDashboard({ onBack, token, officeUser, onLog
                 { label: "Chain", val: chain, set: setChain, opts: uniqValues(rows, "chain") }
               ].map((f, i) => (
                 <div key={i}>
-                  <select value={f.val} onChange={(e) => f.set(e.target.value)} className="w-full p-3 rounded-xl border border-slate-700/50 bg-[#0a0f1c] text-sm font-medium text-slate-400 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 appearance-none">
+                  <select value={f.val} onChange={(e) => f.set(e.target.value)} disabled={officeUser?.[f.label.toLowerCase()] && officeUser[f.label.toLowerCase()].toLowerCase() !== "all"} className="w-full p-3 rounded-xl border border-slate-700/50 bg-[#0a0f1c] text-sm font-medium text-slate-400 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 appearance-none">
                     <option value="">{f.label}</option>
                     {f.opts.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>

@@ -1,11 +1,13 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
 import Papa from "papaparse";
-import { LogOut, RefreshCw, Filter, Database, CheckCircle2, Layers, Calendar, MapPin, Search, Activity, Globe, ArrowLeft, User } from "lucide-react";
+import { LogOut, RefreshCw, Filter, Database, CheckCircle2, Layers, Calendar, MapPin, Search, Activity, Globe, ArrowLeft, User, Presentation, Download } from "lucide-react";
+import * as XLSX from "xlsx";
+import pptxgen from "pptxgenjs";
 
 const DEFAULT_SHEET_URL = "";
 
-export default function DeeniKaamDashboard({ onBack, onLogout }) {
+export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [sheetUrl, setSheetUrl] = useState(DEFAULT_SHEET_URL);
   const [rawData, setRawData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -13,9 +15,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout }) {
 
   const [selectedYear, setSelectedYear] = useState("All");
   const [selectedMonth, setSelectedMonth] = useState("All");
-  const [selectedRegion, setSelectedRegion] = useState("All");
-  const [selectedDistrict, setSelectedDistrict] = useState("All");
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedRegion, setSelectedRegion] = useState(officeUser?.region && officeUser.region.toLowerCase() !== "all" ? officeUser.region : "All");
+  const [selectedDistrict, setSelectedDistrict] = useState(officeUser?.district && officeUser.district.toLowerCase() !== "all" ? officeUser.district : "All");
+  const [selectedCategory, setSelectedCategory] = useState(officeUser?.department && officeUser.department.toLowerCase() !== "all" ? officeUser.department : "All");
   const [searchTerm, setSearchTerm] = useState("");
 
   const fetchData = async () => {
@@ -91,6 +93,50 @@ export default function DeeniKaamDashboard({ onBack, onLogout }) {
     return { totalMuballigh, totalMasjid, totalHalqe, totalReports: filteredData.length };
   }, [filteredData]);
 
+  
+  
+  const downloadExcel = () => {
+    if (!filteredData.length) return alert("No data to export");
+    const worksheet = XLSX.utils.json_to_sheet(filteredData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Deeni Kaam Data");
+    XLSX.writeFile(workbook, `12_Deeni_Kaam_RawData_${new Date().getTime()}.xlsx`);
+  };
+
+  const downloadPPT = () => {
+    if (!filteredData.length) return alert("No data to export");
+    
+    let pres = new pptxgen();
+    
+    let slide1 = pres.addSlide();
+    slide1.background = { color: "0a0f1c" };
+    slide1.addText("12 DEENI KAAM REPORT", { x: 1, y: 2, w: 8, fontSize: 36, bold: true, color: "22d3ee", align: "center" });
+    slide1.addText(`User: ${officeUser?.name || officeUser?.userId || "Admin"}`, { x: 1, y: 3, w: 8, fontSize: 16, color: "94a3b8", align: "center" });
+    slide1.addText(`Generated on: ${new Date().toLocaleDateString()}`, { x: 1, y: 3.5, w: 8, fontSize: 12, color: "64748b", align: "center" });
+
+    let slide2 = pres.addSlide();
+    slide2.background = { color: "0a0f1c" };
+    slide2.addText("Key Performance Indicators", { x: 0.5, y: 0.5, w: 9, fontSize: 24, bold: true, color: "ffffff" });
+    
+    slide2.addShape(pres.ShapeType.rect, { x: 0.5, y: 1.5, w: 4, h: 1.5, fill: "121929", line: {color: "22d3ee", width: 1} });
+    slide2.addText("TOTAL MUBALLIGH", { x: 0.5, y: 1.7, w: 4, fontSize: 12, color: "94a3b8", align: "center" });
+    slide2.addText(kpiStats.totalMuballigh.toLocaleString("en-IN"), { x: 0.5, y: 2.2, w: 4, fontSize: 28, bold: true, color: "ffffff", align: "center" });
+
+    slide2.addShape(pres.ShapeType.rect, { x: 5.5, y: 1.5, w: 4, h: 1.5, fill: "121929", line: {color: "e879f9", width: 1} });
+    slide2.addText("TOTAL MASAJID", { x: 5.5, y: 1.7, w: 4, fontSize: 12, color: "94a3b8", align: "center" });
+    slide2.addText(kpiStats.totalMasjid.toLocaleString("en-IN"), { x: 5.5, y: 2.2, w: 4, fontSize: 28, bold: true, color: "ffffff", align: "center" });
+
+    slide2.addShape(pres.ShapeType.rect, { x: 0.5, y: 3.5, w: 4, h: 1.5, fill: "121929", line: {color: "60a5fa", width: 1} });
+    slide2.addText("ZEILI HALQE", { x: 0.5, y: 3.7, w: 4, fontSize: 12, color: "94a3b8", align: "center" });
+    slide2.addText(kpiStats.totalHalqe.toLocaleString("en-IN"), { x: 0.5, y: 4.2, w: 4, fontSize: 28, bold: true, color: "ffffff", align: "center" });
+
+    slide2.addShape(pres.ShapeType.rect, { x: 5.5, y: 3.5, w: 4, h: 1.5, fill: "121929", line: {color: "34d399", width: 1} });
+    slide2.addText("SYSTEM RECORDS", { x: 5.5, y: 3.7, w: 4, fontSize: 12, color: "94a3b8", align: "center" });
+    slide2.addText(kpiStats.totalReports.toLocaleString("en-IN"), { x: 5.5, y: 4.2, w: 4, fontSize: 28, bold: true, color: "ffffff", align: "center" });
+
+    pres.writeFile({ fileName: `12_Deeni_Kaam_PPT_${new Date().getTime()}.pptx` });
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0f1c] text-slate-300 font-sans relative overflow-hidden">
       <div className="fixed inset-0 z-0 pointer-events-none">
@@ -120,6 +166,12 @@ export default function DeeniKaamDashboard({ onBack, onLogout }) {
               <button onClick={fetchData} disabled={loading} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#1a2333] hover:bg-[#222d42] text-cyan-400 px-3 sm:px-4 py-2.5 rounded-xl border border-cyan-500/20 transition-all active:scale-95 shadow-[0_0_10px_rgba(6,182,212,0.1)]">
                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
                 <span className="hidden sm:inline">Sync Data</span>
+              </button>
+                            <button onClick={downloadPPT} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-cyan-900/30 hover:bg-cyan-900/50 text-cyan-400 px-4 py-2.5 rounded-xl border border-cyan-500/30 transition-all active:scale-95">
+                <Presentation className="w-4 h-4" /> <span className="hidden sm:inline">PPT</span>
+              </button>
+                            <button onClick={downloadExcel} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-900/30 hover:bg-teal-900/50 text-teal-400 px-4 py-2.5 rounded-xl border border-teal-500/30 transition-all active:scale-95">
+                <Download className="w-4 h-4" /> <span className="hidden sm:inline">Excel</span>
               </button>
               <button onClick={onLogout} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-red-500/10 hover:bg-red-500/20 text-red-400 px-3 sm:px-4 py-2.5 rounded-xl border border-red-500/20 transition-all active:scale-95">
                 <LogOut className="w-4 h-4" />
@@ -182,7 +234,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout }) {
               ].map((filter, idx) => (
                 <div key={idx}>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{filter.label}</label>
-                  <select value={filter.value} onChange={(e) => filter.setter(e.target.value)} className="w-full p-3 rounded-xl border border-slate-700/50 bg-[#0a0f1c] text-sm font-medium text-slate-300 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 cursor-pointer appearance-none">
+                  <select value={filter.value} onChange={(e) => filter.setter(e.target.value)} disabled={officeUser?.[filter.label === "Category" ? "department" : filter.label.toLowerCase()] && officeUser[filter.label === "Category" ? "department" : filter.label.toLowerCase()].toLowerCase() !== "all"} className="w-full p-3 rounded-xl border border-slate-700/50 bg-[#0a0f1c] text-sm font-medium text-slate-300 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 cursor-pointer appearance-none">
                     <option value="All">All {filter.label}s</option>
                     {filter.options.map((opt) => (<option key={opt} value={opt}>{opt}</option>))}
                   </select>
