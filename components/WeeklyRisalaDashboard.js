@@ -29,6 +29,7 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
 
   useEffect(() => {
     loadConfigAndData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadConfigAndData = async () => {
@@ -102,7 +103,7 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
         }
         setLoading(false);
       },
-      error: (err) => {
+      error: () => {
         setFetchError("Connection Failed. Make sure link is 'Publish to Web' as CSV.");
         setLoading(false);
       }
@@ -284,7 +285,7 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
                       {config.risalaNo && <span className="border border-teal-600 text-teal-700 font-bold px-3 py-1.5 rounded-lg text-sm bg-teal-50">{config.risalaNo}</span>}
                       <span className="text-teal-700 font-bold text-sm">Date: {new Date().toLocaleDateString('en-GB')} | Time: {new Date().toLocaleTimeString('en-GB')}</span>
                       <button onClick={onLogout} className="bg-[#dc3545] hover:bg-red-700 text-white font-bold py-1.5 px-4 rounded transition-colors text-sm shadow-sm flex items-center gap-1">
-                         <LogOut className="w-4 h-4" /> Logout
+                         Logout
                       </button>
                    </div>
                    <div className="flex flex-wrap items-center gap-3 mt-1">
