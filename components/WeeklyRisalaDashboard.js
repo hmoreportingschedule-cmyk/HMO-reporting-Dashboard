@@ -198,17 +198,17 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
   };
 
   const MiniTable = ({ title, data }) => (
-    <div className="bg-[#121929]/60 backdrop-blur-md rounded-2xl border border-emerald-500/20 overflow-hidden flex flex-col h-[320px] shadow-[0_0_20px_rgba(16,185,129,0.05)]">
-      <div className="p-4 border-b border-emerald-500/20 bg-emerald-900/10 sticky top-0">
-        <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-widest">{title}</h3>
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[320px]">
+      <div className="p-4 border-b border-slate-100 bg-white sticky top-0">
+        <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest">{title}</h3>
       </div>
-      <div className="overflow-y-auto flex-1 p-2 custom-scrollbar">
+      <div className="overflow-y-auto flex-1 custom-scrollbar">
         <table className="w-full text-left text-sm">
           <tbody>
             {data.length > 0 ? data.map((d, i) => (
-              <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                <td className="py-3 px-3 text-slate-300 font-medium text-xs">{d.label}</td>
-                <td className="py-3 px-3 text-emerald-400 font-bold text-right text-sm">{d.count.toLocaleString("en-IN")}</td>
+              <tr key={i} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                <td className="py-2.5 px-4 text-slate-700 font-medium text-xs">{d.label}</td>
+                <td className="py-2.5 px-4 text-teal-700 font-bold text-right text-sm">{d.count.toLocaleString("en-IN")}</td>
               </tr>
             )) : <tr><td colSpan="2" className="text-center py-4 text-slate-500 text-xs">No data available</td></tr>}
           </tbody>
@@ -221,37 +221,37 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
   const maxRegionCount = regionData.length ? Math.max(...regionData.map(d => d.count)) : 0;
 
   return (
-    <div className="min-h-screen bg-[#0a0f1c] text-slate-300 font-sans relative overflow-hidden">
+    <div className="min-h-screen bg-[#e0f2f1] text-slate-800 font-sans relative overflow-hidden">
       <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute top-0 right-0 w-[40rem] h-[40rem] bg-emerald-900/10 rounded-full blur-[150px]"></div>
+        <div className="absolute top-0 right-0 w-[40rem] h-[40rem] bg-teal-100/40 rounded-full blur-[150px]"></div>
       </div>
       <div className="relative z-10">
-        <header className="bg-[#121929]/80 backdrop-blur-xl border-b border-white/5 sticky top-0 z-30">
+        <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
           <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between py-4 gap-4">
             <div className="flex items-center gap-4 w-full md:w-auto">
-              <button onClick={onBack} className="p-2.5 bg-[#1a2333] hover:bg-[#222d42] border border-white/10 text-white rounded-xl shadow-lg transition-colors"><ArrowLeft className="w-5 h-5" /></button>
-              <div className="p-2.5 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.4)] border border-white/10 hidden sm:block">
+              <button onClick={onBack} className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-lg shadow-sm transition-colors"><ArrowLeft className="w-5 h-5" /></button>
+              <div className="p-2.5 bg-teal-700 text-white rounded-lg shadow-sm border border-teal-700 hidden sm:block">
                 <BookOpenCheck className="w-6 h-6" />
               </div>
               <div>
-                <h1 className="text-lg sm:text-xl font-bold text-white tracking-wide">WEEKLY RISALA <span className="font-light text-emerald-400">REPORT</span></h1>
-                <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mt-0.5">{dashboardData.b4Value}</p>
+                <h1 className="text-lg sm:text-xl font-bold text-slate-800 tracking-wide">WEEKLY RISALA <span className="font-light text-teal-700">REPORT</span></h1>
+                <p className="text-[10px] font-bold text-teal-700 uppercase tracking-widest mt-0.5">{dashboardData.b4Value}</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-center md:justify-end gap-3 w-full md:w-auto">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-700 hidden lg:block">
-                User: <span className="text-emerald-400">{officeUser?.name || officeUser?.userId || "Admin"}</span>
+              <div className="text-[10px] font-bold text-slate-600 uppercase tracking-widest bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 hidden lg:block">
+                User: <span className="text-teal-700">{officeUser?.name || officeUser?.userId || "Admin"}</span>
               </div>
-              <button onClick={() => fetchData(sheetUrl)} disabled={loading} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#1a2333] hover:bg-[#222d42] text-emerald-400 px-4 py-2.5 rounded-xl border border-emerald-500/20 transition-all active:scale-95">
+              <button onClick={() => fetchData(sheetUrl)} disabled={loading} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-lg border border-teal-600 transition-all active:scale-95">
                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> <span className="hidden sm:inline">Sync</span>
               </button>
-              <button onClick={downloadPPT} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-400 px-4 py-2.5 rounded-xl border border-emerald-500/30 transition-all active:scale-95">
+              <button onClick={downloadPPT} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-lg border border-teal-600 transition-all active:scale-95">
                 <Presentation className="w-4 h-4" /> <span className="hidden sm:inline">PPT</span>
               </button>
-              <button onClick={downloadExcel} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-900/30 hover:bg-teal-900/50 text-teal-400 px-4 py-2.5 rounded-xl border border-teal-500/30 transition-all active:scale-95">
+              <button onClick={downloadExcel} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#198754] hover:bg-green-700 text-white px-4 py-2.5 rounded-lg border border-[#198754] transition-all active:scale-95">
                 <Download className="w-4 h-4" /> <span className="hidden sm:inline">Excel</span>
               </button>
-              <button onClick={onLogout} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-red-500/10 hover:bg-red-500/20 text-red-400 px-4 py-2.5 rounded-xl border border-red-500/20 transition-all active:scale-95">
+              <button onClick={onLogout} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#dc3545] hover:bg-red-700 text-white px-4 py-2.5 rounded-lg border border-[#dc3545] transition-all active:scale-95">
                 <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Logout</span>
               </button>
             </div>
@@ -262,28 +262,28 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
           
           
 
-          {fetchError && <div className="p-4 bg-red-900/20 border border-red-500/30 text-red-400 rounded-2xl text-sm font-medium flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-red-500 animate-ping"></div>{fetchError}</div>}
+          {fetchError && <div className="p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-medium flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-red-500 animate-ping"></div>{fetchError}</div>}
 
           {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-[#121929]/80 backdrop-blur-md p-6 rounded-3xl border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.1)] relative overflow-hidden group">
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
               <div className="relative flex justify-between items-center z-10">
                 <div className="flex items-center gap-4">
-                    <div className="p-3.5 rounded-2xl bg-slate-800 text-slate-300 border border-white/5"><LayoutDashboard className="w-6 h-6" /></div>
+                    <div className="p-3.5 rounded-lg bg-amber-50 text-amber-500 border border-amber-100"><LayoutDashboard className="w-6 h-6" /></div>
                     <div>
                         <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1">TOTAL SUBMITTED</p>
-                        <h3 className="text-4xl font-extrabold text-white tracking-tight">{filteredRows.length.toLocaleString("en-IN")}</h3>
+                        <h3 className="text-4xl font-extrabold text-teal-700 tracking-tight">{filteredRows.length.toLocaleString("en-IN")}</h3>
                     </div>
                 </div>
               </div>
             </div>
-            <div className="bg-[#121929]/80 backdrop-blur-md p-6 rounded-3xl border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.1)] relative overflow-hidden group">
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
               <div className="relative flex justify-between items-center z-10">
                 <div className="flex items-center gap-4">
-                    <div className="p-3.5 rounded-2xl bg-emerald-900/40 text-emerald-400 border border-emerald-500/20"><Activity className="w-6 h-6" /></div>
+                    <div className="p-3.5 rounded-lg bg-teal-50 text-teal-500 border border-teal-100"><Activity className="w-6 h-6" /></div>
                     <div>
                         <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1">REPORT QUANTITY</p>
-                        <h3 className="text-4xl font-extrabold text-emerald-400 tracking-tight" style={{ textShadow: "0 0 15px rgba(16,185,129,0.4)" }}>{totalReportSum.toLocaleString("en-IN")}</h3>
+                        <h3 className="text-4xl font-extrabold text-teal-700 tracking-tight" >{totalReportSum.toLocaleString("en-IN")}</h3>
                     </div>
                 </div>
               </div>
@@ -291,15 +291,15 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
           </div>
 
           {/* Filters */}
-          <div className="bg-[#121929]/60 backdrop-blur-md p-6 rounded-3xl border border-white/5 shadow-lg">
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
             <div className="flex items-center gap-3 mb-6">
-              <Filter className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-sm font-bold text-white tracking-widest uppercase">Data Parameters</h2>
+              <Filter className="w-5 h-5 text-teal-700" />
+              <h2 className="text-sm font-bold text-slate-800 tracking-widest uppercase">Data Parameters</h2>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
               <div className="col-span-2 md:col-span-1">
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Search</label>
-                <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full p-3 rounded-xl border border-slate-700/50 bg-[#0a0f1c] text-sm font-medium text-slate-300 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50" />
+                <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full p-3 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500" />
               </div>
               {[
                 { label: "Region", val: region, set: handleSetRegion, opts: uniqValues(rows, "region") },
@@ -311,7 +311,7 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
               ].map((f, i) => (
                 <div key={i}>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{f.label}</label>
-                  <select value={f.val} onChange={(e) => f.set(e.target.value)} disabled={officeUser?.[f.label.toLowerCase()] && officeUser[f.label.toLowerCase()].toLowerCase() !== "all"} className="w-full p-3 rounded-xl border border-slate-700/50 bg-[#0a0f1c] text-sm font-medium text-slate-400 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 appearance-none">
+                  <select value={f.val} onChange={(e) => f.set(e.target.value)} disabled={officeUser?.[f.label.toLowerCase()] && officeUser[f.label.toLowerCase()].toLowerCase() !== "all"} className="w-full p-3 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none">
                     <option value="">{f.label}</option>
                     {f.opts.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
@@ -322,18 +322,18 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
 
           {/* Charts Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-[#121929]/60 backdrop-blur-md rounded-2xl border border-emerald-500/20 p-5 shadow-[0_0_20px_rgba(16,185,129,0.05)] h-[320px] flex flex-col">
-               <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-4">REPORTS BY REGION</h3>
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 h-[320px] flex flex-col">
+               <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-4">REPORTS BY REGION</h3>
                <div className="flex-1 flex items-end gap-2 pb-2">
                  {regionData.length > 0 ? regionData.slice(0, 8).map((d, i) => {
                     const h = maxRegionCount ? (d.count / maxRegionCount) * 100 : 0;
                     return (
                       <div key={i} className="flex-1 flex flex-col justify-end items-center group relative h-full">
-                         <div className="opacity-0 group-hover:opacity-100 absolute -top-8 bg-[#0a0f1c] border border-emerald-500/30 text-emerald-400 text-[10px] px-2 py-1 rounded shadow-lg transition-opacity whitespace-nowrap z-10 pointer-events-none">
+                         <div className="opacity-0 group-hover:opacity-100 absolute -top-8 bg-white border border-teal-200 text-teal-700 text-[10px] px-2 py-1 rounded shadow-lg transition-opacity whitespace-nowrap z-10 pointer-events-none">
                            {d.count.toLocaleString("en-IN")}
                          </div>
-                         <div style={{height: `${Math.max(h, 2)}%`}} className="w-full bg-emerald-600/70 group-hover:bg-emerald-400 rounded-t-sm transition-all border-t border-emerald-400/50" />
-                         <span className="text-[9px] text-slate-400 mt-2 truncate w-full text-center px-1" title={d.label}>{d.label}</span>
+                         <div style={{height: `${Math.max(h, 2)}%`}} className="w-full bg-[#21496b] group-hover:bg-[#1e40af] rounded-t-sm transition-all" />
+                         <span className="text-[9px] text-slate-600 mt-2 truncate w-full text-center px-1" title={d.label}>{d.label}</span>
                       </div>
                     )
                  }) : <div className="w-full text-center text-slate-500 text-xs my-auto">No data</div>}
@@ -345,36 +345,36 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
           </div>
 
           {/* Main Table */}
-          <div className="bg-[#121929]/60 backdrop-blur-md rounded-3xl border border-white/5 overflow-hidden shadow-lg mt-6">
-            <div className="p-6 border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 bg-black/20">
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm mt-6">
+            <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 bg-[#e0f2f1]">
               <div>
-                <h2 className="text-sm font-bold text-white uppercase tracking-widest">Detailed Telemetry Output</h2>
-                <p className="text-[11px] text-slate-500 mt-1 uppercase tracking-widest">Source: {dashboardData.totalRows} • Visible: {filteredRows.length}</p>
+                <h2 className="text-sm font-bold text-teal-800 uppercase tracking-widest">Detailed Telemetry Output</h2>
+                <p className="text-[11px] text-slate-600 mt-1 uppercase tracking-widest">Source: {dashboardData.totalRows} • Visible: {filteredRows.length}</p>
               </div>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-[#0a0f1c]/50">
+                <thead className="bg-[#008b8b]">
                   <tr>
                     {["Date", "Name", "Contact", "Chain", "Level", "Department", "Report", "District", "Division", "State", "Region"].map(h => (
-                      <th key={h} className={`px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest ${h==="Report"?"text-emerald-400 text-right":""}`}>{h}</th>
+                      <th key={h} className={`px-4 py-4 text-[10px] font-bold text-white uppercase tracking-widest ${h==="Report"?"text-white text-right":""}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-slate-100">
                   {pagedRows.length > 0 ? pagedRows.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="px-4 py-3 text-xs text-slate-500">{row.date}</td>
-                      <td className="px-4 py-3 text-xs font-bold text-white">{row.name}</td>
-                      <td className="px-4 py-3 text-xs text-slate-400">{row.contact}</td>
-                      <td className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-300"><span className="bg-slate-800 px-2 py-1 rounded">{row.chain}</span></td>
-                      <td className="px-4 py-3 text-xs text-slate-400">{row.nigran || row.zimmedar || row.level}</td>
-                      <td className="px-4 py-3 text-xs text-slate-300">{row.department}</td>
-                      <td className="px-4 py-3 text-sm text-right font-extrabold text-emerald-400">{row.report}</td>
-                      <td className="px-4 py-3 text-xs text-slate-300">{row.district}</td>
-                      <td className="px-4 py-3 text-xs text-slate-400">{row.division}</td>
-                      <td className="px-4 py-3 text-xs text-slate-400">{row.state}</td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{row.region}</td>
+                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3 text-xs text-slate-600">{row.date}</td>
+                      <td className="px-4 py-3 text-xs font-bold text-slate-800">{row.name}</td>
+                      <td className="px-4 py-3 text-xs text-slate-600">{row.contact}</td>
+                      <td className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-600"><span className="bg-slate-100 px-2 py-1 rounded">{row.chain}</span></td>
+                      <td className="px-4 py-3 text-xs text-slate-600">{row.nigran || row.zimmedar || row.level}</td>
+                      <td className="px-4 py-3 text-xs text-slate-700">{row.department}</td>
+                      <td className="px-4 py-3 text-sm text-right font-extrabold text-teal-700">{row.report}</td>
+                      <td className="px-4 py-3 text-xs text-slate-700">{row.district}</td>
+                      <td className="px-4 py-3 text-xs text-slate-600">{row.division}</td>
+                      <td className="px-4 py-3 text-xs text-slate-600">{row.state}</td>
+                      <td className="px-4 py-3 text-xs text-slate-600">{row.region}</td>
                     </tr>
                   )) : (
                     <tr><td colSpan="11" className="px-6 py-12 text-center text-slate-500 text-xs uppercase tracking-widest">{loading ? "Fetching records..." : "No matching records found"}</td></tr>
@@ -383,10 +383,10 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
               </table>
             </div>
             {filteredRows.length > rowsPerPage && (
-              <div className="p-4 border-t border-white/5 bg-black/20 flex justify-center items-center gap-2">
-                <button disabled={currentPage===1} onClick={()=>setCurrentPage(p=>p-1)} className="px-3 py-1.5 rounded-lg border border-white/10 bg-slate-800 text-xs font-bold text-slate-300 disabled:opacity-30">PREV</button>
-                <span className="text-xs font-bold text-emerald-400 px-4">PAGE {currentPage} OF {Math.ceil(filteredRows.length / rowsPerPage)}</span>
-                <button disabled={currentPage===Math.ceil(filteredRows.length / rowsPerPage)} onClick={()=>setCurrentPage(p=>p+1)} className="px-3 py-1.5 rounded-lg border border-white/10 bg-slate-800 text-xs font-bold text-slate-300 disabled:opacity-30">NEXT</button>
+              <div className="p-4 border-t border-slate-200 bg-[#f8fafc] flex justify-center items-center gap-2">
+                <button disabled={currentPage===1} onClick={()=>setCurrentPage(p=>p-1)} className="px-3 py-1.5 rounded-lg border border-teal-600 bg-white text-xs font-bold text-teal-700 disabled:opacity-30">PREV</button>
+                <span className="text-xs font-bold text-teal-700 px-4">PAGE {currentPage} OF {Math.ceil(filteredRows.length / rowsPerPage)}</span>
+                <button disabled={currentPage===Math.ceil(filteredRows.length / rowsPerPage)} onClick={()=>setCurrentPage(p=>p+1)} className="px-3 py-1.5 rounded-lg border border-teal-600 bg-white text-xs font-bold text-teal-700 disabled:opacity-30">NEXT</button>
               </div>
             )}
           </div>
