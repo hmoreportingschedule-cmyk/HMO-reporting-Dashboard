@@ -8,7 +8,7 @@ import WeeklyRisalaDashboard from "../components/WeeklyRisalaDashboard";
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "admin123";
 // ⚠️ IMPORTANT: YAHAN APNA NAYA GOOGLE APPS SCRIPT URL PASTE KAREIN JO STEP 2 ME MILA HAI
-const SCRIPT_URL = "https://docs.google.com/spreadsheets/d/1K6edv8cfSdrPmZJC-pCjwF2MsVHgZ1pzCcME0tbhf5g/edit?usp=sharing";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyF74lC0dNiWUalx0G7GEK3F802IMBMXfuCsqfuCi5-QYuGkOh-85R_BzK9U_O9mfkpUA/exec";
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
