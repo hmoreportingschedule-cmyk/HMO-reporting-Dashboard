@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
 import Papa from "papaparse";
-import { ArrowLeft, BookOpenCheck, LogOut, RefreshCw, Download, Presentation, FileText, Clock } from "lucide-react";
+import { BookOpenCheck, LogOut, RefreshCw, Download, Presentation, FileText, Clock } from "lucide-react";
 import pptxgen from "pptxgenjs";
 import * as XLSX from "xlsx";
 
