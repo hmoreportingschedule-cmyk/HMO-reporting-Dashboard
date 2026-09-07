@@ -389,19 +389,19 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
                         <span>0</span>
                       </div>
                       {/* Chart Area */}
-                      <div className="flex-1 flex items-end gap-2 pl-3 pb-8 relative border-b border-slate-300">
+                      <div className="flex-1 flex justify-center items-end gap-3 sm:gap-6 md:gap-8 pl-3 pb-8 relative border-b border-slate-300">
                         {regionData.slice(0, 8).map((d, i) => {
                            const h = maxRegionCount ? (d.count / maxRegionCount) * 100 : 0;
-                           // Top 1: Green, Top 2: Blue, Top 3: Purple, Top 4+: Orange
-                           const bgColor = i === 0 ? "bg-emerald-500" : i === 1 ? "bg-blue-500" : i === 2 ? "bg-purple-500" : "bg-orange-500";
+                           // Dark colors
+                           const bgColor = i === 0 ? "bg-[#064e3b]" : i === 1 ? "bg-[#1e3a8a]" : i === 2 ? "bg-[#581c87]" : "bg-[#9a3412]";
                            return (
-                             <div key={i} className="flex-1 flex flex-col justify-end items-center relative h-full">
+                             <div key={i} className="flex flex-col justify-end items-center relative h-full w-12 sm:w-16">
                                 {/* Value on Top */}
                                 <span className="text-[11px] font-bold text-slate-800 mb-1.5">{d.count.toLocaleString("en-IN")}</span>
-                                {/* Tower/Bar */}
-                                <div style={{height: `${Math.max(h, 2)}%`}} className={`w-full ${bgColor} rounded-t-sm transition-all hover:opacity-80`} />
+                                {/* Tower/Bar - thinner */}
+                                <div style={{height: `${Math.max(h, 2)}%`}} className={`w-6 sm:w-8 md:w-10 ${bgColor} rounded-t-md transition-all hover:opacity-80`} />
                                 {/* X-Axis Label */}
-                                <span className="absolute -bottom-7 w-full text-center text-[9px] text-slate-600 truncate px-1 font-medium">{d.label}</span>
+                                <span className="absolute -bottom-7 w-20 text-center text-[9px] text-slate-600 truncate px-1 font-medium">{d.label}</span>
                              </div>
                            )
                         })}
