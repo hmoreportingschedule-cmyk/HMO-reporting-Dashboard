@@ -1,15 +1,15 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, BookOpenCheck, LogOut, RefreshCw, Filter, Search, Activity, Download, LayoutDashboard, MapPin, Layers, Presentation } from "lucide-react";
+import Papa from "papaparse";
+import { ArrowLeft, BookOpenCheck, LogOut, RefreshCw, Filter, Search, Activity, Download, LayoutDashboard, Database, Presentation } from "lucide-react";
 import pptxgen from "pptxgenjs";
 import * as XLSX from "xlsx";
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwtCMnX7JgApy0BLFdhs7ByumM8H9JGjLLgDbYMBMpuQjtPHuzywoDesSz1lYZ-hYwE/exec";
-
-export default function WeeklyRisalaDashboard({ onBack, token, officeUser, onLogout }) {
-  const [dashboardData, setDashboardData] = useState({ b4Value: "", b6Value: "", totalRows: 0 });
+export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) {
+  const [sheetUrl, setSheetUrl] = useState("");
+  const [dashboardData, setDashboardData] = useState({ b4Value: "Live CSV Sync", b6Value: "Online", totalRows: 0 });
   const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState("");
 
   const [search, setSearch] = useState("");
@@ -24,30 +24,66 @@ export default function WeeklyRisalaDashboard({ onBack, token, officeUser, onLog
   const rowsPerPage = 10;
 
   useEffect(() => {
-    if (token) fetchDashboard(token);
-  }, [token]);
+    const savedUrl = localStorage.getItem("risala_csv_url");
+    if (savedUrl) {
+      setSheetUrl(savedUrl);
+      fetchData(savedUrl);
+    }
+  }, []);
 
-  const fetchDashboard = async (tkn) => {
+  const fetchData = async (urlToFetch) => {
+    const targetUrl = urlToFetch || sheetUrl;
+    if (!targetUrl) {
+      setFetchError("Please provide a valid Google Sheet CSV URL.");
+      return;
+    }
+    
     setLoading(true);
     setFetchError("");
-    try {
-        const res = await fetch(`${SCRIPT_URL}?action=dashboard&token=${encodeURIComponent(tkn)}&_=${Date.now()}`, { cache: "no-store" });
-        const d = await res.json();
-        if (d.status === "Success") {
-            setDashboardData({ b4Value: d.b4Value, b6Value: d.b6Value, totalRows: d.totalRows });
-            setRows(Array.isArray(d.rows) ? d.rows : []);
-        } else {
-            if (/session|login required|invalid/i.test(d.message || "")) {
-                alert("Session expired or unauthorized. Please login again.");
-                onLogout();
-            } else {
-                setFetchError(d.message || "Failed to load data.");
+    localStorage.setItem("risala_csv_url", targetUrl);
+
+    Papa.parse(targetUrl, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        if (results.data && results.data.length > 0) {
+          const normalizeKey = (key) => key.toLowerCase().replace(/[^a-z]/g, '');
+          const mappedRows = results.data.map(row => {
+            let newRow = { original: row };
+            for (let key in row) {
+              let nKey = normalizeKey(key);
+              if (nKey === 'date' || nKey.includes('timestamp')) newRow.date = row[key];
+              else if (nKey === 'name' || nKey === 'username') newRow.name = row[key];
+              else if (nKey.includes('contact') || nKey.includes('mobile')) newRow.contact = row[key];
+              else if (nKey.includes('chain')) newRow.chain = row[key];
+              else if (nKey.includes('level') || nKey.includes('nigran') || nKey.includes('zimmedar')) newRow.level = row[key];
+              else if (nKey.includes('department')) newRow.department = row[key];
+              else if (nKey.includes('report') || nKey.includes('qty')) newRow.report = row[key];
+              else if (nKey === 'district') newRow.district = row[key];
+              else if (nKey === 'division') newRow.division = row[key];
+              else if (nKey === 'state') newRow.state = row[key];
+              else if (nKey === 'region') newRow.region = row[key];
+              else if (nKey.includes('pincode') || nKey.includes('pin')) newRow.pincode = row[key];
+              else if (nKey === 'country') newRow.country = row[key];
             }
+            newRow.nigran = newRow.level;
+            newRow.zimmedar = newRow.level;
+            return newRow;
+          }).filter(r => Object.keys(r).length > 1); // remove empty rows
+          
+          setRows(mappedRows);
+          setDashboardData({ b4Value: "Live CSV Sync", b6Value: "Online", totalRows: mappedRows.length });
+        } else {
+          setFetchError("Data stream empty or invalid CSV link.");
         }
-    } catch(err) {
-        setFetchError("Network Error. Cannot fetch dashboard data.");
-    }
-    setLoading(false);
+        setLoading(false);
+      },
+      error: (err) => {
+        setFetchError("Connection Failed. Make sure link is 'Publish to Web' as CSV.");
+        setLoading(false);
+      }
+    });
   };
 
   const sameClient = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
@@ -93,63 +129,38 @@ export default function WeeklyRisalaDashboard({ onBack, token, officeUser, onLog
     return [...new Set(data.map(x => String(x[key] || "").trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b));
   };
 
-
   const downloadPPT = () => {
     if (!filteredRows.length) return alert("No data to export");
-    
     let pres = new pptxgen();
-    
-    // Slide 1: Title
     let slide1 = pres.addSlide();
     slide1.background = { color: "0a0f1c" };
     slide1.addText("WEEKLY RISALA REPORT", { x: 1, y: 2, w: 8, fontSize: 36, bold: true, color: "34d399", align: "center" });
     slide1.addText(`User: ${officeUser?.name || officeUser?.userId || "Admin"}`, { x: 1, y: 3, w: 8, fontSize: 16, color: "94a3b8", align: "center" });
     slide1.addText(`Generated on: ${new Date().toLocaleDateString()}`, { x: 1, y: 3.5, w: 8, fontSize: 12, color: "64748b", align: "center" });
 
-    // Slide 2: KPIs
     let slide2 = pres.addSlide();
     slide2.background = { color: "0a0f1c" };
     slide2.addText("Key Performance Indicators", { x: 0.5, y: 0.5, w: 9, fontSize: 24, bold: true, color: "ffffff" });
-    
     slide2.addShape(pres.ShapeType.rect, { x: 1, y: 1.5, w: 3.5, h: 2, fill: "121929", line: {color: "34d399", width: 1} });
     slide2.addText("TOTAL SUBMITTED", { x: 1, y: 1.8, w: 3.5, fontSize: 14, color: "94a3b8", align: "center" });
     slide2.addText(filteredRows.length.toLocaleString("en-IN"), { x: 1, y: 2.3, w: 3.5, fontSize: 32, bold: true, color: "ffffff", align: "center" });
-
     slide2.addShape(pres.ShapeType.rect, { x: 5.5, y: 1.5, w: 3.5, h: 2, fill: "121929", line: {color: "34d399", width: 1} });
     slide2.addText("REPORT QUANTITY", { x: 5.5, y: 1.8, w: 3.5, fontSize: 14, color: "94a3b8", align: "center" });
     slide2.addText(totalReportSum.toLocaleString("en-IN"), { x: 5.5, y: 2.3, w: 3.5, fontSize: 32, bold: true, color: "34d399", align: "center" });
 
-    // Slide 3: Charts
     const regionDataPPT = groupCount(filteredRows, "region");
     if (regionDataPPT.length > 0) {
         let slide3 = pres.addSlide();
         slide3.background = { color: "0a0f1c" };
         slide3.addText("Reports by Region", { x: 0.5, y: 0.5, w: 9, fontSize: 24, bold: true, color: "ffffff" });
-        
-        let chartData = [{
-            name: "Reports",
-            labels: regionDataPPT.slice(0, 8).map(d => d.label || "Unknown"),
-            values: regionDataPPT.slice(0, 8).map(d => d.count)
-        }];
-        
-        slide3.addChart(pres.ChartType.bar, chartData, {
-            x: 0.5, y: 1.2, w: 9, h: 3.5,
-            barDir: "col",
-            chartColors: ["34d399"],
-            valAxisLabelColor: "94a3b8",
-            catAxisLabelColor: "94a3b8",
-            showLegend: false
-        });
+        let chartData = [{ name: "Reports", labels: regionDataPPT.slice(0, 8).map(d => d.label || "Unknown"), values: regionDataPPT.slice(0, 8).map(d => d.count) }];
+        slide3.addChart(pres.ChartType.bar, chartData, { x: 0.5, y: 1.2, w: 9, h: 3.5, barDir: "col", chartColors: ["34d399"], valAxisLabelColor: "94a3b8", catAxisLabelColor: "94a3b8", showLegend: false });
     }
-
     pres.writeFile({ fileName: `Weekly_Risala_PPT_${new Date().getTime()}.pptx` });
   };
 
-  
   const downloadExcel = () => {
     if (!filteredRows.length) return alert("No data to export");
-    
-    // Map data nicely for Excel
     const exportData = filteredRows.map(x => ({
         "Date/Time": x.date || "",
         "Name": x.name || "",
@@ -165,7 +176,6 @@ export default function WeeklyRisalaDashboard({ onBack, token, officeUser, onLog
         "Region": x.region || "",
         "Country": x.country || ""
     }));
-
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Weekly Risala Data");
@@ -210,17 +220,17 @@ export default function WeeklyRisalaDashboard({ onBack, token, officeUser, onLog
               </div>
               <div>
                 <h1 className="text-lg sm:text-xl font-bold text-white tracking-wide">WEEKLY RISALA <span className="font-light text-emerald-400">REPORT</span></h1>
-                <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mt-0.5">{dashboardData.b4Value || "Risala Dashboard"}</p>
+                <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mt-0.5">{dashboardData.b4Value}</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-center md:justify-end gap-3 w-full md:w-auto">
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-700 hidden lg:block">
                 User: <span className="text-emerald-400">{officeUser?.name || officeUser?.userId || "Admin"}</span>
               </div>
-              <button onClick={() => fetchDashboard(token)} disabled={loading} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#1a2333] hover:bg-[#222d42] text-emerald-400 px-4 py-2.5 rounded-xl border border-emerald-500/20 transition-all active:scale-95">
+              <button onClick={() => fetchData(sheetUrl)} disabled={loading} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#1a2333] hover:bg-[#222d42] text-emerald-400 px-4 py-2.5 rounded-xl border border-emerald-500/20 transition-all active:scale-95">
                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> <span className="hidden sm:inline">Sync</span>
               </button>
-                            <button onClick={downloadPPT} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-400 px-4 py-2.5 rounded-xl border border-emerald-500/30 transition-all active:scale-95">
+              <button onClick={downloadPPT} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-400 px-4 py-2.5 rounded-xl border border-emerald-500/30 transition-all active:scale-95">
                 <Presentation className="w-4 h-4" /> <span className="hidden sm:inline">PPT</span>
               </button>
               <button onClick={downloadExcel} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-900/30 hover:bg-teal-900/50 text-teal-400 px-4 py-2.5 rounded-xl border border-teal-500/30 transition-all active:scale-95">
@@ -235,6 +245,19 @@ export default function WeeklyRisalaDashboard({ onBack, token, officeUser, onLog
 
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
           
+          <div className="bg-[#121929]/60 backdrop-blur-md p-5 rounded-2xl border border-white/5 flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="p-2 bg-slate-800/50 rounded-lg border border-slate-700">
+                <Database className="w-5 h-5 text-emerald-400" />
+              </div>
+              <span className="font-semibold text-slate-300 text-sm tracking-wide">Responses CSV Link</span>
+            </div>
+            <div className="flex w-full md:w-2/3 gap-3">
+              <input type="text" value={sheetUrl} onChange={(e) => setSheetUrl(e.target.value)} placeholder="Paste Weekly Risala 'Publish to Web' CSV Link..." className="w-full px-4 py-2.5 text-sm rounded-xl border border-slate-700/50 bg-[#0a0f1c] text-white focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all" />
+              <button onClick={() => fetchData(sheetUrl)} className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs tracking-widest font-bold uppercase rounded-xl shrink-0 transition-colors shadow-[0_0_15px_rgba(16,185,129,0.2)]">Connect</button>
+            </div>
+          </div>
+
           {fetchError && <div className="p-4 bg-red-900/20 border border-red-500/30 text-red-400 rounded-2xl text-sm font-medium flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-red-500 animate-ping"></div>{fetchError}</div>}
 
           {/* KPIs */}
@@ -282,6 +305,7 @@ export default function WeeklyRisalaDashboard({ onBack, token, officeUser, onLog
                 { label: "Chain", val: chain, set: setChain, opts: uniqValues(rows, "chain") }
               ].map((f, i) => (
                 <div key={i}>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{f.label}</label>
                   <select value={f.val} onChange={(e) => f.set(e.target.value)} disabled={officeUser?.[f.label.toLowerCase()] && officeUser[f.label.toLowerCase()].toLowerCase() !== "all"} className="w-full p-3 rounded-xl border border-slate-700/50 bg-[#0a0f1c] text-sm font-medium text-slate-400 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 appearance-none">
                     <option value="">{f.label}</option>
                     {f.opts.map(o => <option key={o} value={o}>{o}</option>)}
