@@ -400,7 +400,7 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
                          </tr>
                       )) : (
                          <tr><td colSpan="11" className="px-6 py-12 text-center text-slate-500 text-sm font-medium">{loading ? "Fetching records..." : "No matching records found"}</td></tr>
-                      )}
+                      ))}
                    </tbody>
                 </table>
              </div>
