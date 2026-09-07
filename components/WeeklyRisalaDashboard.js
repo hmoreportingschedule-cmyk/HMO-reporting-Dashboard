@@ -58,10 +58,10 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
               else if (nKey.includes('level') || nKey.includes('nigran') || nKey.includes('zimmedar')) newRow.level = row[key];
               else if (nKey.includes('department')) newRow.department = row[key];
               else if (nKey.includes('report') || nKey.includes('qty')) newRow.report = row[key];
-              else if (nKey === 'district') newRow.district = row[key];
-              else if (nKey === 'division') newRow.division = row[key];
-              else if (nKey === 'state') newRow.state = row[key];
-              else if (nKey === 'region') newRow.region = row[key];
+              else if (nKey.includes('district')) newRow.district = row[key];
+              else if (nKey.includes('division')) newRow.division = row[key];
+              else if (nKey.includes('state')) newRow.state = row[key];
+              else if (nKey.includes('region')) newRow.region = row[key];
               else if (nKey.includes('pincode') || nKey.includes('pin')) newRow.pincode = row[key];
               else if (nKey === 'country') newRow.country = row[key];
             }
@@ -82,6 +82,23 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
         setLoading(false);
       }
     });
+  };
+
+  
+  const handleSetRegion = (v) => {
+    setRegion(v);
+    if(!(officeUser?.state && officeUser.state.toLowerCase() !== "all")) setState("");
+    if(!(officeUser?.division && officeUser.division.toLowerCase() !== "all")) setDivision("");
+    if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
+  };
+  const handleSetState = (v) => {
+    setState(v);
+    if(!(officeUser?.division && officeUser.division.toLowerCase() !== "all")) setDivision("");
+    if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
+  };
+  const handleSetDivision = (v) => {
+    setDivision(v);
+    if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
   };
 
   const sameClient = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
@@ -285,9 +302,9 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
                 <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full p-3 rounded-xl border border-slate-700/50 bg-[#0a0f1c] text-sm font-medium text-slate-300 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50" />
               </div>
               {[
-                { label: "Region", val: region, set: setRegion, opts: uniqValues(rows, "region") },
-                { label: "State", val: state, set: setState, opts: uniqValues(rows.filter(x=>!region||sameClient(x.region,region)), "state") },
-                { label: "Division", val: division, set: setDivision, opts: uniqValues(rows.filter(x=>(!region||sameClient(x.region,region))&&(!state||sameClient(x.state,state))), "division") },
+                { label: "Region", val: region, set: handleSetRegion, opts: uniqValues(rows, "region") },
+                { label: "State", val: state, set: handleSetState, opts: uniqValues(rows.filter(x=>!region||sameClient(x.region,region)), "state") },
+                { label: "Division", val: division, set: handleSetDivision, opts: uniqValues(rows.filter(x=>(!region||sameClient(x.region,region))&&(!state||sameClient(x.state,state))), "division") },
                 { label: "District", val: district, set: setDistrict, opts: uniqValues(rows.filter(x=>(!region||sameClient(x.region,region))&&(!state||sameClient(x.state,state))&&(!division||sameClient(x.division,division))), "district") },
                 { label: "Department", val: department, set: setDepartment, opts: uniqValues(rows, "department") },
                 { label: "Chain", val: chain, set: setChain, opts: uniqValues(rows, "chain") }
