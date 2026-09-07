@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
 import Papa from "papaparse";
-import { ArrowLeft, BookOpenCheck, LogOut, RefreshCw, Download, Presentation, FileText, Clock, LayoutDashboard, Activity, Filter } from "lucide-react";
+import { ArrowLeft, BookOpenCheck, LogOut, RefreshCw, Download, Presentation, FileText, Clock, LayoutDashboard, Activity, Filter, Search } from "lucide-react";
 import pptxgen from "pptxgenjs";
 import * as XLSX from "xlsx";
 
@@ -58,7 +58,7 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
 
-  const [search, setSearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [region, setRegion] = useState(officeUser?.region && officeUser.region.toLowerCase() !== "all" ? officeUser.region : "");
   const [state, setState] = useState(officeUser?.state && officeUser.state.toLowerCase() !== "all" ? officeUser.state : "");
   const [division, setDivision] = useState(officeUser?.division && officeUser.division.toLowerCase() !== "all" ? officeUser.division : "");
@@ -176,12 +176,12 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
         (!district || sameClient(x.district, district)) &&
         (!department || sameClient(x.department, department)) &&
         (!chain || sameClient(x.chain, chain)) &&
-        (!search || JSON.stringify(x).toLowerCase().includes(search.toLowerCase().trim()))
+        (!searchQuery || JSON.stringify(x).toLowerCase().includes(searchQuery.toLowerCase().trim()))
     );
     return result;
-  }, [rows, search, region, state, division, district, department, chain]);
+  }, [rows, searchQuery, region, state, division, district, department, chain]);
 
-  useEffect(() => { setCurrentPage(1); }, [search, region, state, division, district, department, chain]);
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, region, state, division, district, department, chain]);
 
   const pagedRows = useMemo(() => {
     const start = (currentPage - 1) * rowsPerPage;
@@ -234,13 +234,12 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
         "Chain Type": x.chain || "",
         "Level": x.nigran || x.zimmedar || x.level || "",
         "Department": x.department || "",
-        "Risala Report": x.report || "",
-        "Pincode": x.pincode || "",
         "District": x.district || "",
         "Division": x.division || "",
         "State": x.state || "",
         "Region": x.region || "",
-        "Country": x.country || ""
+        "Country": x.country || "",
+        "Risala Report": x.report || ""
     }));
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
@@ -352,7 +351,10 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
             <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
               <div className="col-span-2 md:col-span-1">
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Search</label>
-                <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full p-3 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500" />
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><Search className="w-4 h-4" /></span>
+                  <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500" />
+                </div>
               </div>
               {[
                 { label: "Region", val: region, set: handleSetRegion, opts: uniqValues(rows, "region") },
@@ -362,9 +364,9 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
                 { label: "Department", val: department, set: setDepartment, opts: uniqValues(rows, "department") },
                 { label: "Chain", val: chain, set: setChain, opts: uniqValues(rows, "chain") }
               ].map((f, i) => (
-                <div key={i}>
+                <div key={i} className="flex flex-col flex-1 min-w-[130px]">
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{f.label}</label>
-                  <select value={f.val} onChange={(e) => f.set(e.target.value)} disabled={officeUser?.[f.label.toLowerCase()] && officeUser[f.label.toLowerCase()].toLowerCase() !== "all"} className="w-full p-3 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none">
+                  <select value={f.val} onChange={(e) => f.set(e.target.value)} disabled={officeUser?.[f.label.toLowerCase()] && officeUser[f.label.toLowerCase()].toLowerCase() !== "all"} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer disabled:bg-slate-50 disabled:text-slate-400">
                     <option value="">{f.label}</option>
                     {f.opts.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
@@ -396,36 +398,37 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
             <MiniTable title="REPORTS BY DIVISION" data={groupCount(filteredRows, "division")} />
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm mt-6">
-            <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 bg-[#e0f2f1]">
+          {/* Optimized Table Section */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm mt-6">
+            <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 bg-[#e0f2f1] rounded-t-xl">
               <div>
                 <h2 className="text-sm font-bold text-teal-800 uppercase tracking-widest">Detailed Telemetry Output</h2>
-                <p className="text-[11px] text-slate-600 mt-1 uppercase tracking-widest">Source: {dashboardData.totalRows} • Visible: {filteredRows.length}</p>
+                <p className="text-[10px] text-slate-600 mt-1 uppercase tracking-widest">Source: {dashboardData.totalRows} &bull; Visible: {filteredRows.length}</p>
               </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm whitespace-nowrap">
+            <div className="overflow-x-auto w-full custom-scrollbar">
+              <table className="w-full text-left text-[11px] lg:text-xs">
                 <thead className="bg-[#008b8b]">
                   <tr>
-                    {["Date", "Name", "Contact", "Chain", "Level", "Department", "Report", "District", "Division", "State", "Region"].map(h => (
-                      <th key={h} className={`px-4 py-4 text-[10px] font-bold text-white uppercase tracking-widest ${h==="Report"?"text-white text-right":""}`}>{h}</th>
+                    {["Date", "Name", "Contact", "Chain", "Level", "Department", "District", "Division", "State", "Region", "Report"].map(h => (
+                      <th key={h} className={`px-2 py-3 font-bold text-white uppercase tracking-wider ${h==="Report"?"text-right":""}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {pagedRows.length > 0 ? pagedRows.map((row, idx) => (
                     <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 text-xs text-slate-600">{row.date}</td>
-                      <td className="px-4 py-3 text-xs font-bold text-slate-800">{row.name}</td>
-                      <td className="px-4 py-3 text-xs text-slate-600">{row.contact}</td>
-                      <td className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold text-slate-600"><span className="bg-slate-100 px-2 py-1 rounded">{row.chain}</span></td>
-                      <td className="px-4 py-3 text-xs text-slate-600">{row.nigran || row.zimmedar || row.level}</td>
-                      <td className="px-4 py-3 text-xs text-slate-700">{row.department}</td>
-                      <td className="px-4 py-3 text-sm text-right font-extrabold text-teal-700">{row.report}</td>
-                      <td className="px-4 py-3 text-xs text-slate-700">{row.district}</td>
-                      <td className="px-4 py-3 text-xs text-slate-600">{row.division}</td>
-                      <td className="px-4 py-3 text-xs text-slate-600">{row.state}</td>
-                      <td className="px-4 py-3 text-xs text-slate-600">{row.region}</td>
+                      <td className="px-2 py-2 text-slate-600 whitespace-nowrap">{row.date}</td>
+                      <td className="px-2 py-2 font-bold text-slate-800 leading-tight">{row.name}</td>
+                      <td className="px-2 py-2 text-slate-600 whitespace-nowrap">{row.contact}</td>
+                      <td className="px-2 py-2 uppercase font-bold text-slate-500 whitespace-nowrap"><span className="bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-[9px]">{row.chain}</span></td>
+                      <td className="px-2 py-2 text-slate-600 leading-tight">{row.nigran || row.zimmedar || row.level}</td>
+                      <td className="px-2 py-2 text-slate-700 leading-tight">{row.department}</td>
+                      <td className="px-2 py-2 text-slate-600 leading-tight">{row.district}</td>
+                      <td className="px-2 py-2 text-slate-600 leading-tight">{row.division}</td>
+                      <td className="px-2 py-2 text-slate-600 leading-tight">{row.state}</td>
+                      <td className="px-2 py-2 text-slate-600 leading-tight">{row.region}</td>
+                      <td className="px-2 py-2 text-right font-extrabold text-teal-700 text-sm whitespace-nowrap bg-teal-50/40">{row.report}</td>
                     </tr>
                   )) : (
                     <tr><td colSpan="11" className="px-6 py-12 text-center text-slate-500 text-xs uppercase tracking-widest">{loading ? "Fetching records..." : "No matching records found"}</td></tr>
@@ -434,10 +437,10 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
               </table>
             </div>
             {filteredRows.length > rowsPerPage && (
-              <div className="p-4 border-t border-slate-200 bg-[#f8fafc] flex justify-center items-center gap-2">
-                <button disabled={currentPage===1} onClick={()=>setCurrentPage(p=>p-1)} className="px-3 py-1.5 rounded-lg border border-teal-600 bg-white text-xs font-bold text-teal-700 disabled:opacity-30">PREV</button>
+              <div className="p-4 border-t border-slate-200 bg-[#f8fafc] rounded-b-xl flex justify-center items-center gap-2">
+                <button disabled={currentPage===1} onClick={()=>setCurrentPage(p=>p-1)} className="px-3 py-1.5 rounded-lg border border-teal-600 bg-white text-xs font-bold text-teal-700 disabled:opacity-30 shadow-sm transition-all hover:bg-teal-50">PREV</button>
                 <span className="text-xs font-bold text-teal-700 px-4">PAGE {currentPage} OF {Math.ceil(filteredRows.length / rowsPerPage)}</span>
-                <button disabled={currentPage===Math.ceil(filteredRows.length / rowsPerPage)} onClick={()=>setCurrentPage(p=>p+1)} className="px-3 py-1.5 rounded-lg border border-teal-600 bg-white text-xs font-bold text-teal-700 disabled:opacity-30">NEXT</button>
+                <button disabled={currentPage===Math.ceil(filteredRows.length / rowsPerPage)} onClick={()=>setCurrentPage(p=>p+1)} className="px-3 py-1.5 rounded-lg border border-teal-600 bg-white text-xs font-bold text-teal-700 disabled:opacity-30 shadow-sm transition-all hover:bg-teal-50">NEXT</button>
               </div>
             )}
           </div>
