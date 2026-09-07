@@ -1,16 +1,61 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
 import Papa from "papaparse";
-import { ArrowLeft, BookOpenCheck, LogOut, RefreshCw, Filter, Search, Activity, Download, LayoutDashboard, Database, Presentation } from "lucide-react";
+import { ArrowLeft, BookOpenCheck, LogOut, RefreshCw, Download, Presentation, FileText, Clock, LayoutDashboard, Activity, Filter } from "lucide-react";
 import pptxgen from "pptxgenjs";
 import * as XLSX from "xlsx";
 
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyF74lC0dNiWUalx0G7GEK3F802IMBMXfuCsqfuCi5-QYuGkOh-85R_BzK9U_O9mfkpUA/exec";
+const DEFAULT_CSV_URL = "https://docs.google.com/spreadsheets/d/1GfMa7j1TIx17jG0g25tdEwU2YgHCm9_fbcrWIUTrSeI/gviz/tq?tqx=out:csv&sheet=Responses";
+
+const sameClient = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+
+const groupCount = (data, key) => {
+  const map = {};
+  data.forEach(x => {
+      const k = (x[key] || "Unknown").trim();
+      const n = Number(String(x.report || "").replace(/,/g, ""));
+      map[k] = (map[k] || 0) + (isNaN(n) ? 0 : n);
+  });
+  return Object.keys(map).sort((a,b) => map[b] - map[a]).map(k => ({ label: k, count: map[k] }));
+};
+
+const uniqValues = (data, key) => {
+  return [...new Set(data.map(x => String(x[key] || "").trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+};
+
+const MiniTable = ({ title, data }) => (
+  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[320px]">
+    <div className="p-4 border-b border-slate-100">
+      <h3 className="text-teal-700 font-bold uppercase tracking-widest text-sm">{title}</h3>
+    </div>
+    <div className="overflow-y-auto flex-1 custom-scrollbar">
+      <table className="w-full text-left text-sm">
+        <thead className="bg-teal-700 text-white sticky top-0 z-10">
+          <tr>
+            <th className="py-2.5 px-4 font-bold text-xs uppercase tracking-wider">Name</th>
+            <th className="py-2.5 px-4 font-bold text-xs uppercase tracking-wider text-right">Report Qty</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {data.length > 0 ? data.map((d, i) => (
+            <tr key={i} className="hover:bg-slate-50 transition-colors">
+              <td className="py-2.5 px-4 text-slate-700">{d.label}</td>
+              <td className="py-2.5 px-4 text-teal-700 font-bold text-right">{d.count.toLocaleString("en-IN")}</td>
+            </tr>
+          )) : <tr><td colSpan="2" className="text-center py-4 text-slate-500 text-xs">No data available</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
+
 export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) {
-  const DEFAULT_CSV_URL = "https://docs.google.com/spreadsheets/d/1GfMa7j1TIx17jG0g25tdEwU2YgHCm9_fbcrWIUTrSeI/gviz/tq?tqx=out:csv&sheet=Responses";
-  const [sheetUrl, setSheetUrl] = useState(DEFAULT_CSV_URL);
-  const [dashboardData, setDashboardData] = useState({ b4Value: "Live CSV Sync", b6Value: "Online", totalRows: 0 });
+  const [config, setConfig] = useState({ officeStatus: "ON", risalaName: "Loading...", offMessage: "Loading...", risalaNo: "" });
+  const [isConfigLoaded, setIsConfigLoaded] = useState(false);
+  const [dashboardData, setDashboardData] = useState({ totalRows: 0 });
   const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
 
   const [search, setSearch] = useState("");
@@ -25,22 +70,45 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
   const rowsPerPage = 10;
 
   useEffect(() => {
-    // Auto sync from the provided Google Sheet
-    fetchData(DEFAULT_CSV_URL);
+    loadConfigAndData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchData = async (urlToFetch) => {
-    const targetUrl = urlToFetch || sheetUrl;
-    if (!targetUrl) {
-      setFetchError("Please provide a valid Google Sheet CSV URL.");
-      return;
-    }
-    
+  const loadConfigAndData = async () => {
     setLoading(true);
     setFetchError("");
-    localStorage.setItem("risala_csv_url", targetUrl);
+    try {
+      const res = await fetch(`${SCRIPT_URL}?action=getRisalaConfig`);
+      const data = await res.json();
+      if (data.status === "Success") {
+        setConfig({
+          officeStatus: String(data.officeStatus).toUpperCase().trim() || "OFF",
+          risalaName: data.risalaName || "N/A",
+          offMessage: data.offMessage || "Dashboard is closed.",
+          risalaNo: data.risalaNo || ""
+        });
+        setIsConfigLoaded(true);
 
-    Papa.parse(targetUrl, {
+        if (String(data.officeStatus).toUpperCase().trim() === "ON") {
+          fetchData();
+        } else {
+          setLoading(false);
+        }
+      } else {
+        setConfig({ officeStatus: "ON", risalaName: "Weekly Risala Report", offMessage: "", risalaNo: "" });
+        setIsConfigLoaded(true);
+        fetchData();
+      }
+    } catch(e) {
+      setConfig({ officeStatus: "ON", risalaName: "Weekly Risala Report", offMessage: "", risalaNo: "" });
+      setIsConfigLoaded(true);
+      fetchData();
+    }
+  };
+
+  const fetchData = async () => {
+    setLoading(true);
+    Papa.parse(DEFAULT_CSV_URL, {
       download: true,
       header: true,
       skipEmptyLines: true,
@@ -68,23 +136,22 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
             newRow.nigran = newRow.level;
             newRow.zimmedar = newRow.level;
             return newRow;
-          }).filter(r => Object.keys(r).length > 1); // remove empty rows
+          }).filter(r => Object.keys(r).length > 1);
           
           setRows(mappedRows);
-          setDashboardData({ b4Value: "Live CSV Sync", b6Value: "Online", totalRows: mappedRows.length });
+          setDashboardData({ totalRows: mappedRows.length });
         } else {
           setFetchError("Data stream empty or invalid CSV link.");
         }
         setLoading(false);
       },
-      error: (err) => {
+      error: () => {
         setFetchError("Connection Failed. Make sure link is 'Publish to Web' as CSV.");
         setLoading(false);
       }
     });
   };
 
-  
   const handleSetRegion = (v) => {
     setRegion(v);
     if(!(officeUser?.state && officeUser.state.toLowerCase() !== "all")) setState("");
@@ -100,8 +167,6 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
     setDivision(v);
     if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
   };
-
-  const sameClient = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
   const filteredRows = useMemo(() => {
     let result = rows.filter(x =>
@@ -123,16 +188,6 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
     return filteredRows.slice(start, start + rowsPerPage);
   }, [filteredRows, currentPage]);
 
-  const groupCount = (data, key) => {
-    const map = {};
-    data.forEach(x => {
-        const k = (x[key] || "Unknown").trim();
-        const n = Number(String(x.report || "").replace(/,/g, ""));
-        map[k] = (map[k] || 0) + (isNaN(n) ? 0 : n);
-    });
-    return Object.keys(map).sort((a,b) => map[b] - map[a]).map(k => ({ label: k, count: map[k] }));
-  };
-
   const totalReportSum = useMemo(() => {
     return filteredRows.reduce((sum, x) => {
         const n = Number(String(x.report || "").replace(/,/g, ""));
@@ -140,36 +195,32 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
     }, 0);
   }, [filteredRows]);
 
-  const uniqValues = (data, key) => {
-    return [...new Set(data.map(x => String(x[key] || "").trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b));
-  };
-
   const downloadPPT = () => {
     if (!filteredRows.length) return alert("No data to export");
     let pres = new pptxgen();
     let slide1 = pres.addSlide();
-    slide1.background = { color: "0a0f1c" };
-    slide1.addText("WEEKLY RISALA REPORT", { x: 1, y: 2, w: 8, fontSize: 36, bold: true, color: "34d399", align: "center" });
-    slide1.addText(`User: ${officeUser?.name || officeUser?.userId || "Admin"}`, { x: 1, y: 3, w: 8, fontSize: 16, color: "94a3b8", align: "center" });
+    slide1.background = { color: "ffffff" };
+    slide1.addText("WEEKLY RISALA REPORT", { x: 1, y: 2, w: 8, fontSize: 36, bold: true, color: "008080", align: "center" });
+    slide1.addText(`User: ${officeUser?.name || officeUser?.userId || "Admin"}`, { x: 1, y: 3, w: 8, fontSize: 16, color: "334155", align: "center" });
     slide1.addText(`Generated on: ${new Date().toLocaleDateString()}`, { x: 1, y: 3.5, w: 8, fontSize: 12, color: "64748b", align: "center" });
 
     let slide2 = pres.addSlide();
-    slide2.background = { color: "0a0f1c" };
-    slide2.addText("Key Performance Indicators", { x: 0.5, y: 0.5, w: 9, fontSize: 24, bold: true, color: "ffffff" });
-    slide2.addShape(pres.ShapeType.rect, { x: 1, y: 1.5, w: 3.5, h: 2, fill: "121929", line: {color: "34d399", width: 1} });
-    slide2.addText("TOTAL SUBMITTED", { x: 1, y: 1.8, w: 3.5, fontSize: 14, color: "94a3b8", align: "center" });
-    slide2.addText(filteredRows.length.toLocaleString("en-IN"), { x: 1, y: 2.3, w: 3.5, fontSize: 32, bold: true, color: "ffffff", align: "center" });
-    slide2.addShape(pres.ShapeType.rect, { x: 5.5, y: 1.5, w: 3.5, h: 2, fill: "121929", line: {color: "34d399", width: 1} });
-    slide2.addText("REPORT QUANTITY", { x: 5.5, y: 1.8, w: 3.5, fontSize: 14, color: "94a3b8", align: "center" });
-    slide2.addText(totalReportSum.toLocaleString("en-IN"), { x: 5.5, y: 2.3, w: 3.5, fontSize: 32, bold: true, color: "34d399", align: "center" });
+    slide2.background = { color: "ffffff" };
+    slide2.addText("Key Performance Indicators", { x: 0.5, y: 0.5, w: 9, fontSize: 24, bold: true, color: "0f766e" });
+    slide2.addShape(pres.ShapeType.rect, { x: 1, y: 1.5, w: 3.5, h: 2, fill: "f8fafc", line: {color: "008080", width: 1} });
+    slide2.addText("TOTAL SUBMITTED", { x: 1, y: 1.8, w: 3.5, fontSize: 14, color: "64748b", align: "center" });
+    slide2.addText(filteredRows.length.toLocaleString("en-IN"), { x: 1, y: 2.3, w: 3.5, fontSize: 32, bold: true, color: "0f766e", align: "center" });
+    slide2.addShape(pres.ShapeType.rect, { x: 5.5, y: 1.5, w: 3.5, h: 2, fill: "f8fafc", line: {color: "008080", width: 1} });
+    slide2.addText("REPORT QUANTITY", { x: 5.5, y: 1.8, w: 3.5, fontSize: 14, color: "64748b", align: "center" });
+    slide2.addText(totalReportSum.toLocaleString("en-IN"), { x: 5.5, y: 2.3, w: 3.5, fontSize: 32, bold: true, color: "0f766e", align: "center" });
 
     const regionDataPPT = groupCount(filteredRows, "region");
     if (regionDataPPT.length > 0) {
         let slide3 = pres.addSlide();
-        slide3.background = { color: "0a0f1c" };
-        slide3.addText("Reports by Region", { x: 0.5, y: 0.5, w: 9, fontSize: 24, bold: true, color: "ffffff" });
+        slide3.background = { color: "ffffff" };
+        slide3.addText("Reports by Region", { x: 0.5, y: 0.5, w: 9, fontSize: 24, bold: true, color: "0f766e" });
         let chartData = [{ name: "Reports", labels: regionDataPPT.slice(0, 8).map(d => d.label || "Unknown"), values: regionDataPPT.slice(0, 8).map(d => d.count) }];
-        slide3.addChart(pres.ChartType.bar, chartData, { x: 0.5, y: 1.2, w: 9, h: 3.5, barDir: "col", chartColors: ["34d399"], valAxisLabelColor: "94a3b8", catAxisLabelColor: "94a3b8", showLegend: false });
+        slide3.addChart(pres.ChartType.bar, chartData, { x: 0.5, y: 1.2, w: 9, h: 3.5, barDir: "col", chartColors: ["008080"], valAxisLabelColor: "475569", catAxisLabelColor: "475569", showLegend: false });
     }
     pres.writeFile({ fileName: `Weekly_Risala_PPT_${new Date().getTime()}.pptx` });
   };
@@ -197,39 +248,36 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
     XLSX.writeFile(workbook, `Weekly_Risala_RawData_${new Date().getTime()}.xlsx`);
   };
 
-  const MiniTable = ({ title, data }) => (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[320px]">
-      <div className="p-4 border-b border-slate-100 bg-white sticky top-0">
-        <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest">{title}</h3>
-      </div>
-      <div className="overflow-y-auto flex-1 custom-scrollbar">
-        <table className="w-full text-left text-sm">
-          <tbody>
-            {data.length > 0 ? data.map((d, i) => (
-              <tr key={i} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                <td className="py-2.5 px-4 text-slate-700 font-medium text-xs">{d.label}</td>
-                <td className="py-2.5 px-4 text-teal-700 font-bold text-right text-sm">{d.count.toLocaleString("en-IN")}</td>
-              </tr>
-            )) : <tr><td colSpan="2" className="text-center py-4 text-slate-500 text-xs">No data available</td></tr>}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-
   const regionData = groupCount(filteredRows, "region");
   const maxRegionCount = regionData.length ? Math.max(...regionData.map(d => d.count)) : 0;
+
+  if (isConfigLoaded && config.officeStatus === "OFF") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#e0f2f1] p-4 font-sans">
+        <div className="bg-white p-8 rounded-xl shadow-lg border-t-[6px] border-red-500 max-w-lg w-full text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">Dashboard Closed</h2>
+          <p className="text-slate-700 font-medium mb-8 leading-relaxed">{config.offMessage}</p>
+          <button onClick={onBack} className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-8 rounded-lg transition-colors shadow-md">
+            Return to Hub
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#e0f2f1] text-slate-800 font-sans relative overflow-hidden">
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute top-0 right-0 w-[40rem] h-[40rem] bg-teal-100/40 rounded-full blur-[150px]"></div>
       </div>
+
       <div className="relative z-10">
         <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
           <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between py-4 gap-4">
             <div className="flex items-center gap-4 w-full md:w-auto">
-              <button onClick={onBack} className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-lg shadow-sm transition-colors"><ArrowLeft className="w-5 h-5" /></button>
+              <button onClick={onBack} className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-lg shadow-sm transition-colors">
+                <ArrowLeft className="w-5 h-5" />
+              </button>
               <div className="p-2.5 bg-teal-700 text-white rounded-lg shadow-sm border border-teal-700 hidden sm:block">
                 <BookOpenCheck className="w-6 h-6" />
               </div>
@@ -242,7 +290,7 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
               <div className="text-[10px] font-bold text-slate-600 uppercase tracking-widest bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 hidden lg:block">
                 User: <span className="text-teal-700">{officeUser?.name || officeUser?.userId || "Admin"}</span>
               </div>
-              <button onClick={() => fetchData(sheetUrl)} disabled={loading} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-lg border border-teal-600 transition-all active:scale-95">
+              <button onClick={() => fetchData()} disabled={loading} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-lg border border-teal-600 transition-all active:scale-95">
                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> <span className="hidden sm:inline">Sync</span>
               </button>
               <button onClick={downloadPPT} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-lg border border-teal-600 transition-all active:scale-95">
@@ -260,16 +308,20 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
 
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
           
-          
+          {fetchError && (
+            <div className="p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-medium flex items-center gap-3">
+              <div className="w-2 h-2 rounded-full bg-red-500 animate-ping"></div>
+              {fetchError}
+            </div>
+          )}
 
-          {fetchError && <div className="p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-medium flex items-center gap-3"><div className="w-2 h-2 rounded-full bg-red-500 animate-ping"></div>{fetchError}</div>}
-
-          {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
               <div className="relative flex justify-between items-center z-10">
                 <div className="flex items-center gap-4">
-                    <div className="p-3.5 rounded-lg bg-amber-50 text-amber-500 border border-amber-100"><LayoutDashboard className="w-6 h-6" /></div>
+                    <div className="p-3.5 rounded-lg bg-amber-50 text-amber-500 border border-amber-100">
+                      <LayoutDashboard className="w-6 h-6" />
+                    </div>
                     <div>
                         <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1">TOTAL SUBMITTED</p>
                         <h3 className="text-4xl font-extrabold text-teal-700 tracking-tight">{filteredRows.length.toLocaleString("en-IN")}</h3>
@@ -280,17 +332,18 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
               <div className="relative flex justify-between items-center z-10">
                 <div className="flex items-center gap-4">
-                    <div className="p-3.5 rounded-lg bg-teal-50 text-teal-500 border border-teal-100"><Activity className="w-6 h-6" /></div>
+                    <div className="p-3.5 rounded-lg bg-teal-50 text-teal-500 border border-teal-100">
+                      <Activity className="w-6 h-6" />
+                    </div>
                     <div>
                         <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1">REPORT QUANTITY</p>
-                        <h3 className="text-4xl font-extrabold text-teal-700 tracking-tight" >{totalReportSum.toLocaleString("en-IN")}</h3>
+                        <h3 className="text-4xl font-extrabold text-teal-700 tracking-tight">{totalReportSum.toLocaleString("en-IN")}</h3>
                     </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Filters */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
             <div className="flex items-center gap-3 mb-6">
               <Filter className="w-5 h-5 text-teal-700" />
@@ -320,7 +373,6 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
             </div>
           </div>
 
-          {/* Charts Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 h-[320px] flex flex-col">
                <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-4">REPORTS BY REGION</h3>
@@ -344,7 +396,6 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
             <MiniTable title="REPORTS BY DIVISION" data={groupCount(filteredRows, "division")} />
           </div>
 
-          {/* Main Table */}
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm mt-6">
             <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 bg-[#e0f2f1]">
               <div>
