@@ -336,10 +336,6 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
                 </div>
                 
                 <div data-html2canvas-ignore="true" className="flex flex-wrap items-center justify-center md:justify-end gap-3 w-full md:w-auto">
-                  <div className="text-[11px] font-extrabold text-black uppercase tracking-widest bg-white px-4 py-2.5 rounded-lg border border-slate-200 hidden lg:flex items-center gap-2 whitespace-nowrap shadow-sm">
-                    <Clock className="w-4 h-4 text-teal-600" />
-                    <span>Date: {dateStr} &bull; Time: {timeStr}</span>
-                  </div>
                   <div className="text-[10px] font-bold text-slate-600 uppercase tracking-widest bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 hidden lg:block">
                     User: <span className="text-teal-700">{officeUser?.name || officeUser?.userId || "Admin"}</span>
                   </div>
@@ -355,6 +351,10 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
                   <button onClick={downloadExcel} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#198754] hover:bg-green-700 text-white px-4 py-2.5 rounded-lg border border-[#198754] transition-all active:scale-95">
                     <Download className="w-4 h-4" /> <span className="hidden sm:inline">Excel</span>
                   </button>
+                  <div className="text-[11px] font-extrabold text-black uppercase tracking-widest bg-white px-4 py-2.5 rounded-lg border border-slate-200 hidden lg:flex items-center gap-2 whitespace-nowrap shadow-sm">
+                    <Clock className="w-4 h-4 text-teal-600" />
+                    <span>Date: {dateStr} &bull; Time: {timeStr}</span>
+                  </div>
                   <button onClick={onLogout} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#dc3545] hover:bg-red-700 text-white px-4 py-2.5 rounded-lg border border-[#dc3545] transition-all active:scale-95">
                     <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Logout</span>
                   </button>
