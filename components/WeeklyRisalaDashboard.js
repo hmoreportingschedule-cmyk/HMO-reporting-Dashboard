@@ -124,7 +124,10 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
               if (nKey === 'date' || nKey.includes('timestamp')) newRow.date = row[key];
               else if (nKey === 'name' || nKey === 'username') newRow.name = row[key];
               else if (nKey.includes('contact') || nKey.includes('mobile')) newRow.contact = row[key];
-              else if (nKey.includes('chain')) newRow.chain = row[key];
+              else if (nKey.includes('chain')) {
+              let cVal = String(row[key] || "").trim();
+              newRow.chain = cVal ? cVal.charAt(0).toUpperCase() + cVal.slice(1).toLowerCase() : "";
+            }
               else if (nKey.includes('level') || nKey.includes('nigran') || nKey.includes('zimmedar')) newRow.level = row[key];
               else if (nKey.includes('department')) newRow.department = row[key];
               else if (nKey.includes('report') || nKey.includes('qty')) newRow.report = row[key];
