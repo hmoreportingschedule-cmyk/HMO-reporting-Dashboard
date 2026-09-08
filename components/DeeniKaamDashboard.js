@@ -7,7 +7,7 @@ import pptxgen from "pptxgenjs";
 import html2canvas from "html2canvas";
 
 // ⚠️ YAHAN DEENI KAAM KI GOOGLE SHEET KA CSV LINK PASTE KAREIN
-const DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/11vxT6LyLIcRNjOAWJZPpmdN0Erz8xj-G/export?format=csv";
+const DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/11vxT6LyLIcRNjOAWJZPpmdN0Erz8xj-G/edit?usp=sharing&ouid=112333571857066993163&rtpof=true&sd=true";
 
 const sameClient = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
