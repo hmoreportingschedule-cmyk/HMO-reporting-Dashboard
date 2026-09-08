@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Lock, User, LogOut, Network, ArrowRight, Loader2, Building2, BookOpen, FileText, Briefcase, Users, ClipboardCheck, CalendarDays, Key } from "lucide-react";
+import { Lock, User, LogOut, Network, ArrowRight, Loader2, Building2, BookOpen, FileText, Briefcase, Users, ClipboardCheck, CalendarDays, Key, UserCheck, CalendarClock } from "lucide-react";
 import DeeniKaamDashboard from "../components/DeeniKaamDashboard";
 import DepartmentDashboard from "../components/DepartmentDashboard";
 import WeeklyRisalaDashboard from "../components/WeeklyRisalaDashboard";
@@ -9,6 +9,8 @@ import TaskIndiaDashboard from "../components/TaskIndiaDashboard";
 import AuditDashboard from "../components/AuditDashboard";
 import HindMushawaratTaskDashboard from "../components/HindMushawaratTaskDashboard";
 import UserAccessDashboard from "../components/UserAccessDashboard";
+import VolunteersDashboard from "../components/VolunteersDashboard";
+import HrScheduleDashboard from "../components/HrScheduleDashboard";
 
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "admin123";
@@ -30,7 +32,7 @@ export default function App() {
   useEffect(() => {
     const authType = sessionStorage.getItem("hmo_auth_type");
     if (authType === "superadmin") {
-        setAccessiblePortals(["deeni", "department", "weekly_risala", "task_office", "task_india", "audit", "hm_task", "user_access"]);
+        setAccessiblePortals(["deeni", "department", "weekly_risala", "task_office", "task_india", "audit", "hm_task", "user_access", "volunteers", "hr_schedule"]);
         setIsAuthenticated(true);
     } else if (authType === "user") {
         const token = sessionStorage.getItem("risalaToken");
@@ -40,7 +42,7 @@ export default function App() {
         
         let userPortals = user.portals && user.portals.length > 0 ? user.portals : ["weekly_risala"];
         if(userPortals.includes("all")) {
-            userPortals = ["deeni", "department", "weekly_risala", "task_office", "task_india", "audit", "hm_task", "user_access"];
+            userPortals = ["deeni", "department", "weekly_risala", "task_office", "task_india", "audit", "hm_task", "user_access", "volunteers", "hr_schedule"];
         }
         
         setAccessiblePortals(userPortals);
@@ -60,7 +62,7 @@ export default function App() {
         setTimeout(() => {
             setIsAuthenticated(true);
             sessionStorage.setItem("hmo_auth_type", "superadmin");
-            setAccessiblePortals(["deeni", "department", "weekly_risala", "task_office", "task_india", "audit", "hm_task", "user_access"]);
+            setAccessiblePortals(["deeni", "department", "weekly_risala", "task_office", "task_india", "audit", "hm_task", "user_access", "volunteers", "hr_schedule"]);
             setCurrentView("hub");
             setIsAuthenticating(false);
         }, 1000);
@@ -79,7 +81,7 @@ export default function App() {
 
             let userPortals = d.user.portals && d.user.portals.length > 0 ? d.user.portals : ["weekly_risala"];
             if(userPortals.includes("all")) {
-                userPortals = ["deeni", "department", "weekly_risala", "task_office", "task_india", "audit", "hm_task", "user_access"];
+                userPortals = ["deeni", "department", "weekly_risala", "task_office", "task_india", "audit", "hm_task", "user_access", "volunteers", "hr_schedule"];
             }
 
             setAccessiblePortals(userPortals);
@@ -153,8 +155,12 @@ export default function App() {
     );
   }
 
+  // Dashboard Routing
   if (currentView === "deeni") return <DeeniKaamDashboard onBack={() => setCurrentView("hub")} onLogout={handleLogout} officeUser={risalaUser} />;
   if (currentView === "department") return <DepartmentDashboard onBack={() => setCurrentView("hub")} officeUser={risalaUser} />;
+  if (currentView === "volunteers") return <VolunteersDashboard onBack={() => setCurrentView("hub")} officeUser={risalaUser} />;
+  if (currentView === "hr_schedule") return <HrScheduleDashboard onBack={() => setCurrentView("hub")} officeUser={risalaUser} />;
+  
   if (currentView === "task_office") return <TaskOfficeDashboard onBack={() => setCurrentView("hub")} officeUser={risalaUser} />;
   if (currentView === "task_india") return <TaskIndiaDashboard onBack={() => setCurrentView("hub")} officeUser={risalaUser} />;
   if (currentView === "audit") return <AuditDashboard onBack={() => setCurrentView("hub")} officeUser={risalaUser} />;
@@ -186,15 +192,6 @@ export default function App() {
            </button>
          </div>
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-           {accessiblePortals.includes("deeni") && (
-             <button onClick={() => setCurrentView("deeni")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-cyan-500/20 shadow-[0_0_20px_rgba(6,182,212,0.1)] hover:shadow-[0_0_40px_rgba(6,182,212,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl group-hover:bg-cyan-500/20 transition-all"></div>
-                <div className="w-16 h-16 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><BookOpen className="w-8 h-8 text-cyan-400" /></div>
-                <h2 className="text-xl font-bold text-white mb-2 tracking-wide">12 Deeni Kaam</h2>
-                <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">Access the live analytics dashboard for 12 Deeni Kaam metrics.</p>
-                <div className="flex items-center gap-2 text-cyan-400 text-sm font-bold tracking-widest uppercase mt-auto">Enter Portal <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
-             </button>
-           )}
            {accessiblePortals.includes("weekly_risala") && (
              <button onClick={() => setCurrentView("weekly_risala")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.1)] hover:shadow-[0_0_40px_rgba(16,185,129,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all"></div>
@@ -204,22 +201,49 @@ export default function App() {
                 <div className="flex items-center gap-2 text-emerald-400 text-sm font-bold tracking-widest uppercase mt-auto">Enter Portal <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
              </button>
            )}
+           {accessiblePortals.includes("deeni") && (
+             <button onClick={() => setCurrentView("deeni")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-cyan-500/20 shadow-[0_0_20px_rgba(6,182,212,0.1)] hover:shadow-[0_0_40px_rgba(6,182,212,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl group-hover:bg-cyan-500/20 transition-all"></div>
+                <div className="w-16 h-16 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><BookOpen className="w-8 h-8 text-cyan-400" /></div>
+                <h2 className="text-xl font-bold text-white mb-2 tracking-wide">12 Deeni Kaam</h2>
+                <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">Access the live analytics dashboard for 12 Deeni Kaam metrics.</p>
+                <div className="flex items-center gap-2 text-cyan-400 text-sm font-bold tracking-widest uppercase mt-auto">Enter Portal <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
+             </button>
+           )}
            {accessiblePortals.includes("department") && (
              <button onClick={() => setCurrentView("department")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-fuchsia-500/20 shadow-[0_0_20px_rgba(217,70,239,0.1)] hover:shadow-[0_0_40px_rgba(217,70,239,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-500/10 rounded-full blur-2xl group-hover:bg-fuchsia-500/20 transition-all"></div>
                 <div className="w-16 h-16 bg-fuchsia-500/10 border border-fuchsia-500/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><Building2 className="w-8 h-8 text-fuchsia-400" /></div>
                 <h2 className="text-xl font-bold text-white mb-2 tracking-wide">Department Report</h2>
-                <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">Under Construction. Future module for detailed departmental analytics.</p>
-                <div className="flex items-center gap-2 text-fuchsia-400 text-sm font-bold tracking-widest uppercase mt-auto">Coming Soon <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
+                <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">Live analytics and performance tracking for departments.</p>
+                <div className="flex items-center gap-2 text-fuchsia-400 text-sm font-bold tracking-widest uppercase mt-auto">Enter Portal <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
+             </button>
+           )}
+           {accessiblePortals.includes("volunteers") && (
+             <button onClick={() => setCurrentView("volunteers")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-blue-400/20 shadow-[0_0_20px_rgba(96,165,250,0.1)] hover:shadow-[0_0_40px_rgba(96,165,250,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/10 rounded-full blur-2xl group-hover:bg-blue-400/20 transition-all"></div>
+                <div className="w-16 h-16 bg-blue-400/10 border border-blue-400/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><UserCheck className="w-8 h-8 text-blue-400" /></div>
+                <h2 className="text-xl font-bold text-white mb-2 tracking-wide">Volunteers & Zimmedaran</h2>
+                <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">Manage and track data for all Volunteers and Zimmedaran.</p>
+                <div className="flex items-center gap-2 text-blue-400 text-sm font-bold tracking-widest uppercase mt-auto">Enter Portal <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
+             </button>
+           )}
+           {accessiblePortals.includes("hr_schedule") && (
+             <button onClick={() => setCurrentView("hr_schedule")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-pink-500/20 shadow-[0_0_20px_rgba(236,72,153,0.1)] hover:shadow-[0_0_40px_rgba(236,72,153,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-pink-500/10 rounded-full blur-2xl group-hover:bg-pink-500/20 transition-all"></div>
+                <div className="w-16 h-16 bg-pink-500/10 border border-pink-500/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><CalendarClock className="w-8 h-8 text-pink-400" /></div>
+                <h2 className="text-xl font-bold text-white mb-2 tracking-wide">HR & Schedule</h2>
+                <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">Under Construction. Future module for HR management and scheduling.</p>
+                <div className="flex items-center gap-2 text-pink-400 text-sm font-bold tracking-widest uppercase mt-auto">Coming Soon <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
              </button>
            )}
            {accessiblePortals.includes("task_office") && (
-             <button onClick={() => setCurrentView("task_office")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.1)] hover:shadow-[0_0_40px_rgba(59,130,246,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all"></div>
-                <div className="w-16 h-16 bg-blue-500/10 border border-blue-500/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><Briefcase className="w-8 h-8 text-blue-400" /></div>
+             <button onClick={() => setCurrentView("task_office")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-indigo-500/20 shadow-[0_0_20px_rgba(99,102,241,0.1)] hover:shadow-[0_0_40px_rgba(99,102,241,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl group-hover:bg-indigo-500/20 transition-all"></div>
+                <div className="w-16 h-16 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><Briefcase className="w-8 h-8 text-indigo-400" /></div>
                 <h2 className="text-xl font-bold text-white mb-2 tracking-wide">Task Mgmt (Office)</h2>
                 <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">Under Construction. Task management for Office Zimmedaran.</p>
-                <div className="flex items-center gap-2 text-blue-400 text-sm font-bold tracking-widest uppercase mt-auto">Coming Soon <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
+                <div className="flex items-center gap-2 text-indigo-400 text-sm font-bold tracking-widest uppercase mt-auto">Coming Soon <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
              </button>
            )}
            {accessiblePortals.includes("task_india") && (
@@ -232,30 +256,12 @@ export default function App() {
              </button>
            )}
            {accessiblePortals.includes("audit") && (
-             <button onClick={() => setCurrentView("audit")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-indigo-500/20 shadow-[0_0_20px_rgba(99,102,241,0.1)] hover:shadow-[0_0_40px_rgba(99,102,241,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl group-hover:bg-indigo-500/20 transition-all"></div>
-                <div className="w-16 h-16 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><ClipboardCheck className="w-8 h-8 text-indigo-400" /></div>
+             <button onClick={() => setCurrentView("audit")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-teal-500/20 shadow-[0_0_20px_rgba(20,184,166,0.1)] hover:shadow-[0_0_40px_rgba(20,184,166,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/10 rounded-full blur-2xl group-hover:bg-teal-500/20 transition-all"></div>
+                <div className="w-16 h-16 bg-teal-500/10 border border-teal-500/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><ClipboardCheck className="w-8 h-8 text-teal-400" /></div>
                 <h2 className="text-xl font-bold text-white mb-2 tracking-wide">Audit Dashboard</h2>
                 <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">Under Construction. Future module for Audit reporting and analytics.</p>
-                <div className="flex items-center gap-2 text-indigo-400 text-sm font-bold tracking-widest uppercase mt-auto">Coming Soon <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
-             </button>
-           )}
-           {accessiblePortals.includes("hm_task") && (
-             <button onClick={() => setCurrentView("hm_task")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-rose-500/20 shadow-[0_0_20px_rgba(244,63,94,0.1)] hover:shadow-[0_0_40px_rgba(244,63,94,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 rounded-full blur-2xl group-hover:bg-rose-500/20 transition-all"></div>
-                <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><CalendarDays className="w-8 h-8 text-rose-400" /></div>
-                <h2 className="text-xl font-bold text-white mb-2 tracking-wide">Hind Mushawarat Task</h2>
-                <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">Under Construction. Task tracking for Hind Mushawarat Meetings.</p>
-                <div className="flex items-center gap-2 text-rose-400 text-sm font-bold tracking-widest uppercase mt-auto">Coming Soon <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
-             </button>
-           )}
-           {accessiblePortals.includes("user_access") && (
-             <button onClick={() => setCurrentView("user_access")} className="group text-left bg-[#121929]/80 backdrop-blur-md p-8 rounded-3xl border border-violet-500/20 shadow-[0_0_20px_rgba(139,92,246,0.1)] hover:shadow-[0_0_40px_rgba(139,92,246,0.3)] hover:-translate-y-2 transition-all duration-300 relative overflow-hidden flex flex-col h-full">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/10 rounded-full blur-2xl group-hover:bg-violet-500/20 transition-all"></div>
-                <div className="w-16 h-16 bg-violet-500/10 border border-violet-500/30 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><Key className="w-8 h-8 text-violet-400" /></div>
-                <h2 className="text-xl font-bold text-white mb-2 tracking-wide">User Assign & Access</h2>
-                <p className="text-slate-400 text-sm leading-relaxed mb-6 flex-grow">Under Construction. Manage system users, roles, and dashboard permissions.</p>
-                <div className="flex items-center gap-2 text-violet-400 text-sm font-bold tracking-widest uppercase mt-auto">Coming Soon <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
+                <div className="flex items-center gap-2 text-teal-400 text-sm font-bold tracking-widest uppercase mt-auto">Coming Soon <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" /></div>
              </button>
            )}
          </div>
