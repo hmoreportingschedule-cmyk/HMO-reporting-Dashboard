@@ -70,6 +70,17 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
+  const [now, setNow] = useState(null);
+  useEffect(() => {
+    setNow(new Date());
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const dateStr = now ? now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') : "";
+  const timeStr = now ? now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : "";
+
+
+
   useEffect(() => {
     loadConfigAndData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -325,6 +336,10 @@ export default function WeeklyRisalaDashboard({ onBack, officeUser, onLogout }) 
                 </div>
                 
                 <div data-html2canvas-ignore="true" className="flex flex-wrap items-center justify-center md:justify-end gap-3 w-full md:w-auto">
+                  <div className="text-[10px] font-bold text-slate-600 uppercase tracking-widest bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 hidden lg:flex items-center gap-2 whitespace-nowrap">
+                    <Clock className="w-3 h-3 text-teal-600" />
+                    <span>Date: {dateStr} &bull; Time: {timeStr}</span>
+                  </div>
                   <div className="text-[10px] font-bold text-slate-600 uppercase tracking-widest bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 hidden lg:block">
                     User: <span className="text-teal-700">{officeUser?.name || officeUser?.userId || "Admin"}</span>
                   </div>
