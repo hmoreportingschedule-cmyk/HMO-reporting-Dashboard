@@ -322,13 +322,16 @@ export default function DepartmentDashboard({ onBack, onLogout, officeUser }) {
                   <button onClick={downloadExcel} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#198754] hover:bg-green-700 text-white px-4 py-2.5 rounded-lg border border-[#198754] transition-all active:scale-95">
                     <Download className="w-4 h-4" /> <span className="hidden sm:inline">Excel</span>
                   </button>
-                  <div className="text-[11px] font-extrabold text-black uppercase tracking-widest bg-white px-4 py-2.5 rounded-lg border border-slate-200 hidden lg:flex items-center gap-2 whitespace-nowrap shadow-sm">
-                    <Clock className="w-4 h-4 text-teal-600" />
-                    <span>Date: {dateStr} &bull; Time: {timeStr}</span>
-                  </div>
-                  <button onClick={onLogout} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#dc3545] hover:bg-red-700 text-white px-4 py-2.5 rounded-lg border border-[#dc3545] transition-all active:scale-95">
+                  
+                  <div className="w-full flex justify-end items-center gap-3 mt-2">
+                    <div className="text-[11px] font-extrabold text-black uppercase tracking-widest bg-white px-4 py-2.5 rounded-lg border border-slate-200 hidden lg:flex items-center gap-2 whitespace-nowrap shadow-sm">
+                      <Clock className="w-4 h-4 text-teal-600" />
+                      <span>Date: {dateStr} &bull; Time: {timeStr}</span>
+                    </div>
+                    <button onClick={onLogout} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#dc3545] hover:bg-red-700 text-white px-4 py-2.5 rounded-lg border border-[#dc3545] transition-all active:scale-95">
                     <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Logout</span>
                   </button>
+                  </div>
                 </div>
               </div>
             </header>
