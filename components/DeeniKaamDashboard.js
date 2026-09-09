@@ -7,7 +7,7 @@ import pptxgen from "pptxgenjs";
 import html2canvas from "html2canvas";
 
 // ⚠️ YAHAN DEENI KAAM KI GOOGLE SHEET KA CSV LINK PASTE KAREIN
-const DEFAULT_SHEET_URL = "https://drive.google.com/uc?export=download&id=1xRe-BTJzHWq4IDw8x3YEfVrXsk_89rhU&confirm=t";
+const DEFAULT_SHEET_URL = "/deeni_data.csv";
 
 const sameClient = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
@@ -89,47 +89,32 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   }, []);
 
     const fetchData = async () => {
-    if (!sheetUrl) return;
     setLoading(true);
     setFetchError("");
 
-    try {
-      // Using allorigins to bypass CORS and confirm=t to bypass Google Drive virus scan for large files
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(sheetUrl)}`;
-      const response = await fetch(proxyUrl);
-      
-      if (!response.ok) {
-        throw new Error("File is too large, proxy failed, or file is not public.");
-      }
-      
-      const csvText = await response.text();
-
-      Papa.parse(csvText, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          if (results.data && results.data.length > 0) {
-            const processed = results.data.map(row => ({
-              ...row,
-              Target: Number(String(row["Target"] || "0").replace(/,/g, "")),
-              Achievement: Number(String(row["Achievement"] || row["Achivement"] || "0").replace(/,/g, "")),
-              ParsedDate: new Date(row["Date"] || row["Date/Time"]) 
-            }));
-            setRawData(processed);
-          } else {
-            setFetchError("Data stream empty. CSV format issue.");
-          }
-          setLoading(false);
-        },
-        error: (err) => {
-          setFetchError("Failed to parse CSV format.");
-          setLoading(false);
-        },
-      });
-    } catch (err) {
-      setFetchError("Connection Error: " + err.message);
-      setLoading(false);
-    }
+    Papa.parse(sheetUrl, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        if (results.data && results.data.length > 0) {
+          const processed = results.data.map(row => ({
+            ...row,
+            Target: Number(String(row["Target"] || "0").replace(/,/g, "")),
+            Achievement: Number(String(row["Achievement"] || row["Achivement"] || "0").replace(/,/g, "")),
+            ParsedDate: new Date(row["Date"] || row["Date/Time"]) 
+          }));
+          setRawData(processed);
+        } else {
+          setFetchError("Data stream empty. File might be empty.");
+        }
+        setLoading(false);
+      },
+      error: () => {
+        setFetchError("File not found! Kripya apni CSV file ko GitHub ke 'public' folder mein 'deeni_data.csv' ke naam se upload karein.");
+        setLoading(false);
+      },
+    });
   };
 
   const setYTD = () => {
@@ -313,20 +298,20 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   </div>
                 </div>
                 
-                <div data-html2canvas-ignore="true" className="flex flex-wrap items-center justify-center md:justify-end gap-3 w-full md:w-auto">
+                <div className="flex flex-wrap items-center justify-center md:justify-end gap-3 w-full md:w-auto">
                   <div className="text-[10px] font-bold text-slate-600 uppercase tracking-widest bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 hidden lg:block">
                     User: <span className="text-teal-700">{officeUser?.name || officeUser?.userId || "Admin"}</span>
                   </div>
-                  <button onClick={fetchData} disabled={loading} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-lg border border-teal-600 transition-all active:scale-95">
+                  <button data-html2canvas-ignore="true" onClick={fetchData} disabled={loading} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-lg border border-teal-600 transition-all active:scale-95">
                     <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> <span className="hidden sm:inline">Sync</span>
                   </button>
-                  <button onClick={downloadJPEG} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#0f766e] hover:bg-[#115e59] text-white px-4 py-2.5 rounded-lg border border-[#0f766e] transition-all active:scale-95 shadow-md">
+                  <button data-html2canvas-ignore="true" onClick={downloadJPEG} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#0f766e] hover:bg-[#115e59] text-white px-4 py-2.5 rounded-lg border border-[#0f766e] transition-all active:scale-95 shadow-md">
                     <ImageIcon className="w-4 h-4" /> <span className="hidden sm:inline">JPEG</span>
                   </button>
-                  <button onClick={downloadPPT} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-lg border border-teal-600 transition-all active:scale-95">
+                  <button data-html2canvas-ignore="true" onClick={downloadPPT} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-lg border border-teal-600 transition-all active:scale-95">
                     <Presentation className="w-4 h-4" /> <span className="hidden sm:inline">PPT</span>
                   </button>
-                  <button onClick={downloadExcel} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#198754] hover:bg-green-700 text-white px-4 py-2.5 rounded-lg border border-[#198754] transition-all active:scale-95">
+                  <button data-html2canvas-ignore="true" onClick={downloadExcel} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#198754] hover:bg-green-700 text-white px-4 py-2.5 rounded-lg border border-[#198754] transition-all active:scale-95">
                     <Download className="w-4 h-4" /> <span className="hidden sm:inline">Excel</span>
                   </button>
                   
@@ -335,7 +320,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       <Clock className="w-4 h-4 text-teal-600" />
                       <span>Date: {dateStr} &bull; Time: {timeStr}</span>
                     </div>
-                    <button onClick={onLogout} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#dc3545] hover:bg-red-700 text-white px-4 py-2.5 rounded-lg border border-[#dc3545] transition-all active:scale-95">
+                    <button data-html2canvas-ignore="true" onClick={onLogout} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#dc3545] hover:bg-red-700 text-white px-4 py-2.5 rounded-lg border border-[#dc3545] transition-all active:scale-95">
                     <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Logout</span>
                   </button>
                   </div>
