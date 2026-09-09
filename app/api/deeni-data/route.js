@@ -1,45 +1,69 @@
-import { NextResponse } from 'next/server';
+'use client';
+import { useState, useEffect } from 'react';
 
-export const dynamic = 'force-dynamic';
+export default function Dashboard() {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-const sheetUrls = [
-  'https://docs.google.com/spreadsheets/d/1P1Ul-jXOfFfhuQLTKeQ-zOynKnCmywH-_gjZ9nJ8tO0/export?format=csv',
-  'https://docs.google.com/spreadsheets/d/1S2tEIyaN8p-yu4Vd_GVumqBqwzgTzM3zlms4DwCJr00/export?format=csv',
-  'https://docs.google.com/spreadsheets/d/1yWVgL9IVGrQFElLNeO8X_UGAIDSAGF7P8M31gGtoki8/export?format=csv'
-];
-
-export async function GET() {
-  try {
-    let allRows = [];
-
-    for (const url of sheetUrls) {
+  useEffect(() => {
+    async function fetchData() {
       try {
-        const response = await fetch(url, { next: { revalidate: 60 } }); // 60 seconds caching for lightning speed
-        if (!response.ok) continue;
-        
-        const csvText = await response.text();
-        const lines = csvText.split('\n').filter(line => line.trim() !== '');
-        
-        if (lines.length > 0) {
-          const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-          
-          for (let i = 1; i < lines.length; i++) {
-            const currentLine = lines[i].split(',');
-            let rowObj = {};
-            for (let j = 0; j < headers.length; j++) {
-              rowObj[headers[j]] = currentLine[j] ? currentLine[j].trim().replace(/^"|"$/g, '') : '';
-            }
-            allRows.push(rowObj);
-          }
+        const res = await fetch('/api/deeni-data');
+        const json = await res.json();
+        if (json.success) {
+          setData(json.data);
+        } else {
+          setError(json.error);
         }
       } catch (err) {
-        console.error('Error fetching sheet:', err);
+        setError('Failed to fetch data');
+      } finally {
+        setLoading(false);
       }
     }
+    fetchData();
+  }, []);
 
-    return NextResponse.json({ success: true, data: allRows });
-  } catch (error) {
-    console.error('Sheets Error:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-950 text-white">
+        <p className="text-lg">Loading Deeni Kaam data from Google Sheets...</p>
+      </div>
+    );
   }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-950 text-red-500">
+        <p>Error: {error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-8 bg-gray-950 min-h-screen text-white">
+      <h1 className="text-2xl font-bold mb-6">Deeni Kaam Dashboard</h1>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse border border-gray-800">
+          <thead>
+            <tr className="bg-gray-900">
+              {data.length > 0 && Object.keys(data[0]).map((key) => (
+                <th key={key} className="border border-gray-800 p-2 text-left">{key}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((row, index) => (
+              <tr key={index} className="hover:bg-gray-900">
+                {Object.values(row).map((val, idx) => (
+                  <td key={idx} className="border border-gray-800 p-2">{val}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
