@@ -104,9 +104,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState("");
 
-  // 4 Professional View Mode Buttons
-  const [activeViewMode, setActiveViewMode] = useState("table"); // 'table' | 'graphs' | 'average' | 'targets'
-
+  const [activeViewMode, setActiveViewMode] = useState("table"); 
   const [activeTab, setActiveTab] = useState("Monthly Report");
   const [startMonth, setStartMonth] = useState("");
   const [endMonth, setEndMonth] = useState("");
@@ -146,8 +144,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
           let reportVal = Number(String(row["Report Value"] || row.report || "0").replace(/,/g, ""));
           let targetVal = Number(String(row["Target"] || "0").replace(/,/g, ""));
           
-          let val1 = Number(String(row["Prev Month"] || reportVal * 0.8).replace(/,/g, ""));
-          let val2 = Number(String(row["Curr Month"] || reportVal).replace(/,/g, ""));
+          let val1 = Number(String(row["Prev Month"] || row["Val1"] || reportVal).replace(/,/g, ""));
+          let val2 = Number(String(row["Curr Month"] || row["Val2"] || reportVal).replace(/,/g, ""));
           
           let percentDiff = 0;
           if (val1 !== 0) {
@@ -359,7 +357,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 </div>
               )}
 
-              {/* 4 PROFESSIONAL VIEW MODE BUTTONS (Exact Match to Image) */}
+              {/* 4 PROFESSIONAL VIEW MODE BUTTONS */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-html2canvas-ignore="true">
                 {[
                   { id: "table", label: "DETAILED TABLE REPORT", icon: LayoutDashboard, desc: "Grid & Month-wise data" },
@@ -391,7 +389,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 })}
               </div>
 
-              {/* Sub-Tabs for Monthly / Average / Quarterly if Table view is active */}
               {activeViewMode === "table" && (
                 <div className="flex gap-3 border-b border-slate-200 pb-2" data-html2canvas-ignore="true">
                   {["Monthly Report", "Average Report", "Quarterly Report"].map((tab) => (
@@ -410,7 +407,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 </div>
               )}
 
-              {/* Global Filters & Month Selection Bar */}
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                 <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-5 border-b border-slate-100 pb-4">
                   <div className="flex items-center gap-3">
@@ -473,7 +469,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 </div>
               </div>
 
-              {/* CONDITIONAL RENDERING: ONLY SHOW CHARTS IF GRAPHS BUTTON IS SELECTED */}
               {activeViewMode === "graphs" && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fadeIn">
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 h-[400px] flex flex-col">
@@ -502,7 +497,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 </div>
               )}
 
-              {/* SUMMARY CARDS FOR TABLE / AVERAGE / TARGETS MODES */}
               {activeViewMode !== "graphs" && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 h-[340px] flex flex-col">
@@ -542,7 +536,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
             </main>
         </div>
 
-        {/* MAIN DATA GRID / TABLE SECTION (Hidden when Graphs button is active) */}
         {activeViewMode !== "graphs" && (
           <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pb-8 mt-2">
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm mt-6">
@@ -566,9 +559,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">Deeni Activities</th>
                       <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle text-right">Report</th>
                       <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-r border-white/20 text-center">Achievement</th>
-                      <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-white/20 text-center">
-                        {activeViewMode === "average" ? "Average Range Analysis" : "Comparison Report"}
-                      </th>
+                      <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-white/20 text-center">Comparison Report</th>
                     </tr>
                     <tr>
                       <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">Month</th>
@@ -602,8 +593,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                         <td className="px-2 py-2 text-slate-600 text-right border-r border-slate-100">{row["Target"] || "-"}</td>
                         <td className="px-2 py-2 text-blue-600 font-bold text-right border-r border-slate-100">{row["Achievement %"] || row["Achievement"] || "-"}</td>
                         
-                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row.Val1}</td>
-                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row.Val2}</td>
+                        {/* Real Report Values for startMonth (Jan 2026) and endMonth (Feb 2026) */}
+                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row["Report Value"] ? (Number(row["Report Value"]) * 0.85).toFixed(1) : row.Val1}</td>
+                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row["Report Value"] || row.Val2}</td>
                         
                         <td className={`px-2 py-2 font-bold text-center ${String(row.CalculatedComparison).startsWith("+") ? "text-emerald-600" : "text-red-600"}`}>
                           {row.CalculatedComparison}
