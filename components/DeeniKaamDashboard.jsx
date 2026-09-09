@@ -114,8 +114,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [state, setState] = useState(officeUser?.state && officeUser.state.toLowerCase() !== "all" ? officeUser.state : "");
   const [division, setDivision] = useState(officeUser?.division && officeUser.division.toLowerCase() !== "all" ? officeUser.division : "");
   const [district, setDistrict] = useState(officeUser?.district && officeUser.district.toLowerCase() !== "all" ? officeUser.district : "");
-  const [selectedField, setSelectedField] = useState(""); // Deeni Activities (Fields)
-  const [selectedCategory, setSelectedCategory] = useState(""); // Category
+  const [selectedField, setSelectedField] = useState(""); 
+  const [selectedCategory, setSelectedCategory] = useState(""); 
   
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -201,7 +201,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       const matchDivision = !division || sameClient(row["Division"], division);
       const matchDistrict = !district || sameClient(row["District"], district);
       
-      const fieldVal = row["Fields"] || "";
+      const fieldVal = row["Fields"] || row["Deeni Activities"] || "";
       const matchField = !selectedField || sameClient(fieldVal, selectedField);
 
       const catVal = row["Category"] || "";
@@ -395,7 +395,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     </div>
                   </div>
 
-                  {/* Deeni Activities (Fields Column) Dropdown */}
                   <div className="flex flex-col flex-1 min-w-[130px]">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Deeni Activities</label>
                     <select value={selectedField} onChange={(e) => setSelectedField(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
@@ -404,7 +403,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     </select>
                   </div>
 
-                  {/* Category Column Dropdown */}
                   <div className="flex flex-col flex-1 min-w-[130px]">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Category</label>
                     <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
@@ -511,13 +509,19 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["State"] || "-"}</td>
                       <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["Division"] || "-"}</td>
                       <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["District"] || "-"}</td>
-                      <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100">{row["Fields"] || "-"}</td>
+                      
+                      {/* Deeni Activities (Fields Column) */}
+                      <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100">{row["Fields"] || row["Deeni Activities"] || "-"}</td>
+                      
                       <td className="px-2 py-2 text-right font-extrabold text-teal-700 text-sm bg-teal-50/40 border-r border-slate-100">{row["Report Value"] || row.report || "0"}</td>
                       
+                      {/* Month Column Value */}
                       <td className="px-2 py-2 text-slate-600 text-center border-r border-slate-100">{row["Month"] || "-"}</td>
+                      
                       <td className="px-2 py-2 text-slate-600 text-right border-r border-slate-100">{row["Target"] || "-"}</td>
                       <td className="px-2 py-2 text-blue-600 font-bold text-right border-r border-slate-100">{row["Achievement %"] || row["Achievement"] || "-"}</td>
                       
+                      {/* Selected Month Report Values */}
                       <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row.Val1}</td>
                       <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row.Val2}</td>
                       
