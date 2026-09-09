@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
 import Papa from "papaparse";
-import { LogOut, RefreshCw, Filter, Calendar, MapPin, Search, Activity, ArrowLeft, Download, BookOpenCheck, Image as ImageIcon, Clock } from "lucide-react";
+import { LogOut, RefreshCw, Filter, Calendar, Search, Activity, ArrowLeft, Download, BookOpenCheck, Image as ImageIcon, Clock } from "lucide-react";
 import * as XLSX from "xlsx";
 import pptxgen from "pptxgenjs";
 import html2canvas from "html2canvas";
@@ -79,7 +79,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState("");
 
-  const [activeTab, setActiveTab] = useState("Monthly Report"); // Monthly Report | Average Report | Quarterly Report
+  const [activeTab, setActiveTab] = useState("Monthly Report");
   const [startMonth, setStartMonth] = useState("");
   const [endMonth, setEndMonth] = useState("");
   
@@ -87,7 +87,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [state, setState] = useState(officeUser?.state && officeUser.state.toLowerCase() !== "all" ? officeUser.state : "");
   const [division, setDivision] = useState(officeUser?.division && officeUser.division.toLowerCase() !== "all" ? officeUser.division : "");
   const [district, setDistrict] = useState(officeUser?.district && officeUser.district.toLowerCase() !== "all" ? officeUser.district : "");
-  const [selectedCategory, setSelectedCategory] = useState(officeUser?.department && officeUser.department.toLowerCase() !== "all" ? officeUser.department : "");
+  const [selectedActivity, setSelectedActivity] = useState(""); // Deeni Activities Filter
   
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -166,60 +166,50 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
   };
 
-  // Main Filter Logic with Tab and Month-Wise support
+  // Filter Logic with Deeni Activities (Fields) & Month mapping
   const filteredData = useMemo(() => {
     return rawData.filter((row) => {
       const matchRegion = !region || sameClient(row["Region"], region);
       const matchState = !state || sameClient(row["State"], state);
       const matchDivision = !division || sameClient(row["Division"], division);
       const matchDistrict = !district || sameClient(row["District"], district);
-      const matchCategory = !selectedCategory || sameClient(row["Category"] || row["Fields"], selectedCategory);
+      
+      const activityVal = row["Fields"] || row["Category"] || "";
+      const matchActivity = !selectedActivity || sameClient(activityVal, selectedActivity);
+
       const matchSearch = !searchTerm || JSON.stringify(row).toLowerCase().includes(searchTerm.toLowerCase().trim());
       
       let dateMatch = true;
-      const rowMonth = row["Month"] || ""; // expects format YYYY-MM in sheet or matching filter
+      const rowMonth = row["Month"] || ""; 
       if (startMonth || endMonth) {
         if (startMonth && rowMonth && rowMonth < startMonth) dateMatch = false;
         if (endMonth && rowMonth && rowMonth > endMonth) dateMatch = false;
       }
         
-      return matchRegion && matchState && matchDivision && matchDistrict && matchCategory && matchSearch && dateMatch;
+      return matchRegion && matchState && matchDivision && matchDistrict && matchActivity && matchSearch && dateMatch;
     });
-  }, [rawData, region, state, division, district, selectedCategory, searchTerm, startMonth, endMonth]);
+  }, [rawData, region, state, division, district, selectedActivity, searchTerm, startMonth, endMonth]);
 
-  // Tab-based data transformation (Monthly, Average, Quarterly)
   const processedTableData = useMemo(() => {
     if (activeTab === "Average Report") {
-      // Calculate averages per field/category or district
       return filteredData.map(row => {
         let v1 = Number(row.Val1 || 0);
         let v2 = Number(row.Val2 || 0);
         let avgVal = Math.round((v1 + v2) / 2);
-        return {
-          ...row,
-          Val1: Math.round(v1 / 2),
-          Val2: Math.round(v2 / 2),
-          "Report Value": avgVal
-        };
+        return { ...row, Val1: Math.round(v1 / 2), Val2: Math.round(v2 / 2), "Report Value": avgVal };
       });
     } else if (activeTab === "Quarterly Report") {
-      // Multiply or aggregate for quarterly view estimation
       return filteredData.map(row => {
         let v1 = Number(row.Val1 || 0) * 3;
         let v2 = Number(row.Val2 || 0) * 3;
         let qVal = Math.round((v1 + v2) / 2);
-        return {
-          ...row,
-          Val1: v1,
-          Val2: v2,
-          "Report Value": qVal
-        };
+        return { ...row, Val1: v1, Val2: v2, "Report Value": qVal };
       });
     }
-    return filteredData; // Monthly Report default
+    return filteredData;
   }, [filteredData, activeTab]);
 
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, region, state, division, district, selectedCategory, startMonth, endMonth, activeTab]);
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, region, state, division, district, selectedActivity, startMonth, endMonth, activeTab]);
 
   const pagedRows = useMemo(() => {
     const start = (currentPage - 1) * rowsPerPage;
@@ -365,7 +355,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                   <div className="col-span-2 md:col-span-1" data-html2canvas-ignore="true">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Search</label>
                     <div className="relative">
@@ -373,6 +363,16 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500" />
                     </div>
                   </div>
+
+                  {/* Deeni Activities (Fields) Dropdown */}
+                  <div className="flex flex-col flex-1 min-w-[130px]">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Deeni Activities</label>
+                    <select value={selectedActivity} onChange={(e) => setSelectedActivity(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
+                      <option value="">All Activities</option>
+                      {uniqValues(rawData, "Fields").map(act => <option key={act} value={act}>{act}</option>)}
+                    </select>
+                  </div>
+
                   {[
                     { label: "Region", val: region, set: handleSetRegion, opts: uniqValues(rawData, "Region") },
                     { label: "State", val: state, set: handleSetState, opts: uniqValues(rawData.filter(x=>!region||sameClient(x["Region"],region)), "State") },
@@ -471,7 +471,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["State"] || "-"}</td>
                       <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["Division"] || "-"}</td>
                       <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["District"] || "-"}</td>
-                      <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100">{row["Category"] || row["Fields"] || "-"}</td>
+                      <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100">{row["Fields"] || row["Category"] || "-"}</td>
                       <td className="px-2 py-2 text-right font-extrabold text-teal-700 text-sm bg-teal-50/40 border-r border-slate-100">{row["Report Value"] || row.report || "0"}</td>
                       
                       <td className="px-2 py-2 text-slate-600 text-center border-r border-slate-100">{row["Month"] || "-"}</td>
