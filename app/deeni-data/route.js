@@ -12,7 +12,7 @@ export async function GET() {
 
     return NextResponse.json({ success: true, data: rows });
   } catch (error) {
-    console.പരമായ('BigQuery Error:', error);
+    console.error('BigQuery Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
