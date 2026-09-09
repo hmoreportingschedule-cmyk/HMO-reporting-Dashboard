@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
-// Future mein nayi sheet ka link add karne ke liye bas yahan array mein link paste kar dena hai!
+export const dynamic = 'force-dynamic'; // Yeh line Next.js ko static prerender karne se rokti hai
+
 const sheetUrls = [
   'https://docs.google.com/spreadsheets/d/1P1Ul-jXOfFfhuQLTKeQ-zOynKnCmywH-_gjZ9nJ8tO0/export?format=csv',
   'https://docs.google.com/spreadsheets/d/1S2tEIyaN8p-yu4Vd_GVumqBqwzgTzM3zlms4DwCJr00/export?format=csv',
@@ -13,7 +14,7 @@ export async function GET() {
 
     for (const url of sheetUrls) {
       try {
-        const response = await fetch(url);
+        const response = await fetch(url, { cache: 'no-store' });
         if (!response.ok) continue;
         
         const csvText = await response.text();
