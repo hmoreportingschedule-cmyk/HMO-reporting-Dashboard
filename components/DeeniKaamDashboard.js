@@ -95,30 +95,64 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     try {
       const fileIdMatch = DEFAULT_SHEET_URL.match(/\/d\/([a-zA-Z0-9_-]+)/);
       const fileId = fileIdMatch ? fileIdMatch[1] : "";
-      if (!fileId) {
-        throw new Error("Invalid Google Drive file URL. Please paste a valid link.");
+      if (!fileId) throw new Error("Invalid Google Drive Link.");
+
+      const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+      
+      const proxies = [
+        `https://corsproxy.io/?${encodeURIComponent(driveUrl)}`,
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(driveUrl)}`
+      ];
+
+      let response;
+      let arrayBuffer;
+      let success = false;
+
+      for (let proxy of proxies) {
+        try {
+          response = await fetch(proxy);
+          if (!response.ok) continue;
+
+          arrayBuffer = await response.arrayBuffer();
+          const uint8View = new Uint8Array(arrayBuffer);
+          
+          // Excel files start with 'PK' (50 4B)
+          if (uint8View[0] === 0x50 && uint8View[1] === 0x4B) {
+            success = true;
+            break; 
+          }
+          
+          // Handle Google Drive Large File Virus Scan Warning
+          const text = new TextDecoder().decode(arrayBuffer);
+          if (text.includes("confirm=")) {
+             const tokenMatch = text.match(/confirm=([a-zA-Z0-9_-]+)/);
+             if (tokenMatch) {
+                const token = tokenMatch[1];
+                const newDriveUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=${token}`;
+                const newProxyUrl = proxy.replace(encodeURIComponent(driveUrl), encodeURIComponent(newDriveUrl));
+                const secondResponse = await fetch(newProxyUrl);
+                if (secondResponse.ok) {
+                   arrayBuffer = await secondResponse.arrayBuffer();
+                   const newUint8 = new Uint8Array(arrayBuffer);
+                   if (newUint8[0] === 0x50 && newUint8[1] === 0x4B) {
+                      success = true;
+                      break;
+                   }
+                }
+             }
+          }
+        } catch (e) {
+          console.warn("Proxy failed", proxy, e);
+        }
       }
 
-      // Convert GDrive link to direct download link with confirm=t for large files
-      const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`;
-      
-      // Use corsproxy to safely fetch binary Excel data
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(driveUrl)}`;
-
-      const response = await fetch(proxyUrl);
-      if (!response.ok) {
-        throw new Error("Google Drive connection blocked. Ensure file is Public.");
+      if (!success) {
+        throw new Error("File fetch fail ho gaya. Kripya dhyan dein ki aapki Google Drive File 'Anyone with the link' (Public) par set hai aur Private nahi hai.");
       }
 
-      // Read as ArrayBuffer for XLSX parsing
-      const arrayBuffer = await response.arrayBuffer();
-      
-      // Parse with XLSX (SheetJS)
+      // Parse with XLSX
       const workbook = XLSX.read(arrayBuffer, { type: "array" });
-      const firstSheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[firstSheetName];
-      
-      // Convert to JSON
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
       if (jsonData && jsonData.length > 0) {
@@ -130,11 +164,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         }));
         setRawData(processed);
       } else {
-        setFetchError("Data stream empty. File format issue or empty file.");
+        setFetchError("Excel file empty hai ya data sahi format mein nahi hai.");
       }
       setLoading(false);
     } catch (err) {
-      setFetchError("Connection Error: " + err.message);
+      setFetchError("Sync Error: " + err.message);
       setLoading(false);
     }
   };
