@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
 import Papa from "papaparse";
-import { LogOut, RefreshCw, Filter, Calendar, Search, Activity, ArrowLeft, Download, BookOpenCheck, Image as ImageIcon, Clock } from "lucide-react";
+import { LogOut, RefreshCw, Filter, Calendar, Search, Activity, ArrowLeft, Download, BookOpenCheck, Image as ImageIcon, Clock, LayoutDashboard, BarChart3, TrendingUp, Target } from "lucide-react";
 import * as XLSX from "xlsx";
 import pptxgen from "pptxgenjs";
 import html2canvas from "html2canvas";
@@ -51,7 +51,6 @@ const formatMonthYearLabel = (val) => {
 const parseRowMonth = (row) => {
   let raw = String(row["Month"] || row["Date"] || row["Report Date"] || "").trim();
   if (!raw) return "";
-  
   if (/^\d{4}-\d{2}$/.test(raw)) return raw;
 
   let parsed = Date.parse(raw);
@@ -71,7 +70,6 @@ const parseRowMonth = (row) => {
       return `${yr}-${months[m]}`;
     }
   }
-
   return raw;
 };
 
@@ -106,6 +104,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState("");
 
+  // Professional View Mode Buttons (Tabs)
+  const [activeViewMode, setActiveViewMode] = useState("table"); // 'table' | 'graphs' | 'average' | 'targets'
+
   const [activeTab, setActiveTab] = useState("Monthly Report");
   const [startMonth, setStartMonth] = useState("");
   const [endMonth, setEndMonth] = useState("");
@@ -114,8 +115,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [state, setState] = useState(officeUser?.state && officeUser.state.toLowerCase() !== "all" ? officeUser.state : "");
   const [division, setDivision] = useState(officeUser?.division && officeUser.division.toLowerCase() !== "all" ? officeUser.division : "");
   const [district, setDistrict] = useState(officeUser?.district && officeUser.district.toLowerCase() !== "all" ? officeUser.district : "");
-  const [selectedCategory, setSelectedCategory] = useState(""); // Category first
-  const [selectedField, setSelectedField] = useState(""); // Deeni Activities second
+  const [selectedCategory, setSelectedCategory] = useState(""); 
+  const [selectedField, setSelectedField] = useState(""); 
   
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -194,7 +195,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
   };
 
-  // Category dependent options for Deeni Activities (Fileds)
   const availableFields = useMemo(() => {
     let subset = rawData;
     if (selectedCategory) {
@@ -233,7 +233,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   }, [rawData, region, state, division, district, selectedCategory, selectedField, searchTerm, startMonth, endMonth]);
 
   const processedTableData = useMemo(() => {
-    if (activeTab === "Average Report") {
+    if (activeTab === "Average Report" || activeViewMode === "average") {
       return filteredData.map(row => {
         let v1 = Number(row.Val1 || 0);
         let v2 = Number(row.Val2 || 0);
@@ -249,9 +249,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       });
     }
     return filteredData;
-  }, [filteredData, activeTab]);
+  }, [filteredData, activeTab, activeViewMode]);
 
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, region, state, division, district, selectedCategory, selectedField, startMonth, endMonth, activeTab]);
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, region, state, division, district, selectedCategory, selectedField, startMonth, endMonth, activeTab, activeViewMode]);
 
   const pagedRows = useMemo(() => {
     const start = (currentPage - 1) * rowsPerPage;
@@ -317,8 +317,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     <BookOpenCheck className="w-6 h-6" />
                   </div>
                   <div>
-                    <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-wide">12 DEENI KAAM <span className="font-light text-teal-700">REPORT</span></h1>
-                    <p className="text-[10px] font-bold text-teal-700 uppercase tracking-widest mt-0.5">Live Data Synchronization</p>
+                    <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-wide">12 DEENI KAAM <span className="font-light text-teal-700">REPORT HUB</span></h1>
+                    <p className="text-[10px] font-bold text-teal-700 uppercase tracking-widest mt-0.5">Professional Multi-View Dashboard</p>
                   </div>
                 </div>
                 
@@ -359,27 +359,63 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 </div>
               )}
 
-              <div className="flex gap-3 border-b border-slate-200 pb-2" data-html2canvas-ignore="true">
-                {["Monthly Report", "Average Report", "Quarterly Report"].map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm ${
-                      activeTab === tab
-                        ? "bg-teal-700 text-white shadow-md"
-                        : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                ))}
+              {/* PROFESSIONAL 4-BUTTON VIEW MODE NAVIGATION */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-html2canvas-ignore="true">
+                {[
+                  { id: "table", label: "Detailed Table Report", icon: LayoutDashboard, desc: "Grid & Month-wise data" },
+                  { id: "graphs", label: "Visual Analytics & Graphs", icon: BarChart3, desc: "District/State charts" },
+                  { id: "average", label: "Average & Comparison", icon: TrendingUp, desc: "Range growth analysis" },
+                  { id: "targets", label: "Targets & Achievement", icon: Target, desc: "Goal performance matrix" }
+                ].map((btn) => {
+                  const IconComp = btn.icon;
+                  const isActive = activeViewMode === btn.id;
+                  return (
+                    <button
+                      key={btn.id}
+                      onClick={() => setActiveViewMode(btn.id)}
+                      className={`p-4 rounded-2xl border text-left transition-all shadow-sm flex items-start gap-3.5 ${
+                        isActive
+                          ? "bg-teal-800 text-white border-teal-900 shadow-md transform -translate-y-0.5"
+                          : "bg-white text-slate-700 hover:bg-slate-50 border-slate-200"
+                      }`}
+                    >
+                      <div className={`p-2.5 rounded-xl ${isActive ? "bg-teal-700 text-white" : "bg-teal-50 text-teal-700"}`}>
+                        <IconComp className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider">{btn.label}</h3>
+                        <p className={`text-[10px] mt-0.5 ${isActive ? "text-teal-200" : "text-slate-400"}`}>{btn.desc}</p>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
 
+              {/* Sub-Tabs for Monthly / Average / Quarterly if Table view is active */}
+              {activeViewMode === "table" && (
+                <div className="flex gap-3 border-b border-slate-200 pb-2" data-html2canvas-ignore="true">
+                  {["Monthly Report", "Average Report", "Quarterly Report"].map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm ${
+                        activeTab === tab
+                          ? "bg-teal-700 text-white shadow-md"
+                          : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Global Filters & Month Selection Bar */}
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                 <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-5 border-b border-slate-100 pb-4">
                   <div className="flex items-center gap-3">
                     <Filter className="w-5 h-5 text-teal-700" />
-                    <h2 className="text-sm font-bold text-slate-800 tracking-widest uppercase">{activeTab} Filters</h2>
+                    <h2 className="text-sm font-bold text-slate-800 tracking-widest uppercase">Global Filters & Range Picker</h2>
                   </div>
                   
                   <div className="flex flex-wrap items-center gap-3" data-html2canvas-ignore="true">
@@ -396,7 +432,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
-                  {/* 1. Search Box */}
                   <div className="col-span-2 md:col-span-1" data-html2canvas-ignore="true">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Search</label>
                     <div className="relative">
@@ -405,7 +440,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     </div>
                   </div>
 
-                  {/* 2. Category Box (After Search) */}
                   <div className="flex flex-col flex-1 min-w-[130px]">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Category</label>
                     <select value={selectedCategory} onChange={(e) => { setSelectedCategory(e.target.value); setSelectedField(""); }} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
@@ -414,7 +448,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     </select>
                   </div>
 
-                  {/* 3. Deeni Activities Box (After Category with dependent options) */}
                   <div className="flex flex-col flex-1 min-w-[130px]">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Deeni Activities</label>
                     <select value={selectedField} onChange={(e) => setSelectedField(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
@@ -440,48 +473,86 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 h-[340px] flex flex-col">
-                    <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-4">{dynamicGraphTitle} ({activeTab})</h3>
-                    <div className="flex-1 flex w-full pt-2">
+              {/* CONDITIONAL VIEW RENDERING BASED ON BUTTON SELECTED */}
+              
+              {/* VIEW 1 & VIEW 3 & VIEW 4: Tables / Average / Targets */}
+              {(activeViewMode === "table" || activeViewMode === "average" || activeViewMode === "targets") && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 h-[340px] flex flex-col">
+                      <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-4">{dynamicGraphTitle}</h3>
+                      <div className="flex-1 flex w-full pt-2">
+                        {dynamicGraphData.length > 0 ? (
+                          <>
+                            <div className="flex flex-col justify-between items-end pr-3 border-r border-slate-300 pb-8 text-[10px] font-bold text-slate-500 w-12 shrink-0">
+                              <span>{maxDynamicCount.toLocaleString("en-IN")}</span>
+                              <span>{Math.round(maxDynamicCount / 2).toLocaleString("en-IN")}</span>
+                              <span>0</span>
+                            </div>
+                            <div className="flex-1 flex justify-start items-end gap-4 sm:gap-6 pl-4 pb-8 relative border-b border-slate-300 overflow-x-auto custom-scrollbar">
+                              {dynamicGraphData.slice(0, 10).map((d, i) => {
+                                 const h = maxDynamicCount ? (d.count / maxDynamicCount) * 100 : 0;
+                                 const bgColor = i === 0 ? "bg-[#064e3b]" : i === 1 ? "bg-[#1e3a8a]" : i === 2 ? "bg-[#581c87]" : "bg-[#9a3412]";
+                                 return (
+                                   <div key={i} className="flex flex-col justify-end items-center relative h-full w-10 sm:w-14 shrink-0">
+                                      <span className="text-[11px] font-bold text-slate-800 mb-1.5">{d.count.toLocaleString("en-IN")}</span>
+                                      <div style={{height: `${Math.max(h, 2)}%`}} className={`w-8 sm:w-12 ${bgColor} rounded-t-md transition-all hover:opacity-80`} />
+                                      <span className="absolute -bottom-7 w-20 text-center text-[9px] text-slate-600 truncate px-1 font-medium">{d.label}</span>
+                                   </div>
+                                 )
+                              })}
+                            </div>
+                          </>
+                        ) : <div className="w-full text-center text-slate-400 text-xs my-auto font-medium">No data available</div>}
+                      </div>
+                   </div>
+                   
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[340px] overflow-hidden">
+                     <MiniTable title="REPORTS BY STATE" data={groupCount(processedTableData, "State")} />
+                     <MiniTable title="REPORTS BY DIVISION" data={groupCount(processedTableData, "Division")} />
+                   </div>
+                </div>
+              )}
+
+              {/* VIEW 2: FULL GRAPHS & ANALYTICS MODE */}
+              {activeViewMode === "graphs" && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 h-[400px] flex flex-col">
+                    <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-4">Primary Distribution Chart ({dynamicGraphTitle})</h3>
+                    <div className="flex-1 flex w-full pt-4">
                       {dynamicGraphData.length > 0 ? (
-                        <>
-                          <div className="flex flex-col justify-between items-end pr-3 border-r border-slate-300 pb-8 text-[10px] font-bold text-slate-500 w-12 shrink-0">
-                            <span>{maxDynamicCount.toLocaleString("en-IN")}</span>
-                            <span>{Math.round(maxDynamicCount / 2).toLocaleString("en-IN")}</span>
-                            <span>0</span>
-                          </div>
-                          <div className="flex-1 flex justify-start items-end gap-4 sm:gap-6 pl-4 pb-8 relative border-b border-slate-300 overflow-x-auto custom-scrollbar">
-                            {dynamicGraphData.slice(0, 10).map((d, i) => {
-                               const h = maxDynamicCount ? (d.count / maxDynamicCount) * 100 : 0;
-                               const bgColor = i === 0 ? "bg-[#064e3b]" : i === 1 ? "bg-[#1e3a8a]" : i === 2 ? "bg-[#581c87]" : "bg-[#9a3412]";
-                               return (
-                                 <div key={i} className="flex flex-col justify-end items-center relative h-full w-10 sm:w-14 shrink-0">
-                                    <span className="text-[11px] font-bold text-slate-800 mb-1.5">{d.count.toLocaleString("en-IN")}</span>
-                                    <div style={{height: `${Math.max(h, 2)}%`}} className={`w-8 sm:w-12 ${bgColor} rounded-t-md transition-all hover:opacity-80`} />
-                                    <span className="absolute -bottom-7 w-20 text-center text-[9px] text-slate-600 truncate px-1 font-medium">{d.label}</span>
-                                 </div>
-                               )
-                            })}
-                          </div>
-                        </>
-                      ) : <div className="w-full text-center text-slate-400 text-xs my-auto font-medium">No data available to display</div>}
+                        <div className="flex-1 flex justify-start items-end gap-4 pl-4 pb-8 relative border-b border-slate-300 overflow-x-auto custom-scrollbar">
+                          {dynamicGraphData.slice(0, 12).map((d, i) => {
+                             const h = maxDynamicCount ? (d.count / maxDynamicCount) * 100 : 0;
+                             return (
+                               <div key={i} className="flex flex-col justify-end items-center relative h-full w-12 shrink-0">
+                                  <span className="text-[10px] font-bold text-slate-700 mb-1">{d.count.toLocaleString("en-IN")}</span>
+                                  <div style={{height: `${Math.max(h, 2)}%`}} className="w-10 bg-teal-700 rounded-t-md transition-all" />
+                                  <span className="absolute -bottom-7 w-24 text-center text-[9px] text-slate-600 truncate">{d.label}</span>
+                               </div>
+                             )
+                          })}
+                        </div>
+                      ) : <div className="mx-auto my-auto text-slate-400 text-xs">No graph data found</div>}
                     </div>
-                 </div>
-                 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[340px] overflow-hidden">
-                   <MiniTable title="REPORTS BY STATE" data={groupCount(processedTableData, "State")} />
-                   <MiniTable title="REPORTS BY DIVISION" data={groupCount(processedTableData, "Division")} />
-                 </div>
-              </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[400px]">
+                    <MiniTable title="STATE WISE METRICS" data={groupCount(processedTableData, "State")} />
+                    <MiniTable title="DISTRICT WISE METRICS" data={groupCount(processedTableData, "District")} />
+                  </div>
+                </div>
+              )}
+
             </main>
         </div>
 
+        {/* MAIN DATA GRID / TABLE SECTION */}
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pb-8 mt-2">
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm mt-6">
             <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 bg-[#e0f2f1] rounded-t-xl">
               <div>
-                <h2 className="text-sm font-bold text-teal-800 uppercase tracking-widest">Detailed Telemetry Output ({activeTab})</h2>
+                <h2 className="text-sm font-bold text-teal-800 uppercase tracking-widest">
+                  {activeViewMode === "average" ? "Average & Range Comparison Matrix" : activeViewMode === "targets" ? "Targets & Achievement Matrix" : `Detailed Telemetry Output (${activeTab})`}
+                </h2>
                 <p className="text-[10px] text-slate-600 mt-1 uppercase tracking-widest">Source: {rawData.length} &bull; Visible: {processedTableData.length}</p>
               </div>
             </div>
@@ -497,7 +568,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">Deeni Activities</th>
                     <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle text-right">Report</th>
                     <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-r border-white/20 text-center">Achievement</th>
-                    <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-white/20 text-center">Comparison Report ({activeTab})</th>
+                    <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-white/20 text-center">
+                      {activeViewMode === "average" ? "Average Range Analysis" : "Comparison Report"}
+                    </th>
                   </tr>
                   <tr>
                     <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">Month</th>
@@ -522,7 +595,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["Division"] || "-"}</td>
                       <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["District"] || "-"}</td>
                       
-                      {/* Deeni Activities (Fileds Column) */}
                       <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100">{row["Fileds"] || row["Fields"] || row["Deeni Activities"] || "-"}</td>
                       
                       <td className="px-2 py-2 text-right font-extrabold text-teal-700 text-sm bg-teal-50/40 border-r border-slate-100">{row["Report Value"] || row.report || "0"}</td>
