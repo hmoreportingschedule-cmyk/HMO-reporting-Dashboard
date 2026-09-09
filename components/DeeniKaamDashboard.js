@@ -93,82 +93,95 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     setFetchError("");
 
     try {
-      const fileIdMatch = DEFAULT_SHEET_URL.match(/\/d\/([a-zA-Z0-9_-]+)/);
-      const fileId = fileIdMatch ? fileIdMatch[1] : "";
-      if (!fileId) throw new Error("Invalid Google Drive Link.");
-
-      const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+      const fileIdMatch = sheetUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      const fileId = fileIdMatch ? fileIdMatch[1] : "1xRe-BTJzHWq4IDw8x3YEfVrXsk_89rhU";
       
-      const proxies = [
-        `https://corsproxy.io/?${encodeURIComponent(driveUrl)}`,
-        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(driveUrl)}`
-      ];
-
-      let response;
-      let arrayBuffer;
       let success = false;
+      let data = [];
 
-      for (let proxy of proxies) {
+      // Approach 1: Native GViz CSV Export (Fastest, Bypass CORS internally on Google's end)
+      try {
+        const gvizUrl = `https://docs.google.com/spreadsheets/d/${fileId}/gviz/tq?tqx=out:csv`;
+        const res = await fetch(gvizUrl);
+        const text = await res.text();
+        if (res.ok && !text.toLowerCase().includes("<html")) {
+           const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+           if (parsed.data && parsed.data.length > 0) {
+              data = parsed.data;
+              success = true;
+           }
+        }
+      } catch (e) { console.warn("GViz failed", e); }
+
+      // Approach 2: Direct CSV Export
+      if (!success) {
         try {
-          response = await fetch(proxy);
-          if (!response.ok) continue;
-
-          arrayBuffer = await response.arrayBuffer();
-          const uint8View = new Uint8Array(arrayBuffer);
-          
-          // Excel files start with 'PK' (50 4B)
-          if (uint8View[0] === 0x50 && uint8View[1] === 0x4B) {
-            success = true;
-            break; 
-          }
-          
-          // Handle Google Drive Large File Virus Scan Warning
-          const text = new TextDecoder().decode(arrayBuffer);
-          if (text.includes("confirm=")) {
-             const tokenMatch = text.match(/confirm=([a-zA-Z0-9_-]+)/);
-             if (tokenMatch) {
-                const token = tokenMatch[1];
-                const newDriveUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=${token}`;
-                const newProxyUrl = proxy.replace(encodeURIComponent(driveUrl), encodeURIComponent(newDriveUrl));
-                const secondResponse = await fetch(newProxyUrl);
-                if (secondResponse.ok) {
-                   arrayBuffer = await secondResponse.arrayBuffer();
-                   const newUint8 = new Uint8Array(arrayBuffer);
-                   if (newUint8[0] === 0x50 && newUint8[1] === 0x4B) {
-                      success = true;
-                      break;
-                   }
-                }
+          const csvUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=csv`;
+          const res = await fetch(csvUrl);
+          const text = await res.text();
+          if (res.ok && !text.toLowerCase().includes("<html")) {
+             const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+             if (parsed.data && parsed.data.length > 0) {
+                data = parsed.data;
+                success = true;
              }
           }
-        } catch (e) {
-          console.warn("Proxy failed", proxy, e);
-        }
+        } catch (e) { console.warn("CSV Export failed", e); }
       }
 
+      // Approach 3: Fallback to Multiple Proxies + SheetJS (For raw Excel files blocking CSV export)
       if (!success) {
-        throw new Error("File fetch fail ho gaya. Kripya dhyan dein ki aapki Google Drive File 'Anyone with the link' (Public) par set hai aur Private nahi hai.");
+         const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`;
+         const proxies = [
+           `https://api.allorigins.win/raw?url=${encodeURIComponent(driveUrl)}`,
+           `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(driveUrl)}`,
+           `https://corsproxy.io/?${encodeURIComponent(driveUrl)}`
+         ];
+
+         for (let proxy of proxies) {
+            try {
+               const res = await fetch(proxy);
+               if (!res.ok) continue;
+               
+               const arrayBuffer = await res.arrayBuffer();
+               
+               // Prevent parsing HTML error pages (like virus warning)
+               const uint8View = new Uint8Array(arrayBuffer);
+               if (uint8View[0] !== 0x50 && uint8View[0] !== 0xEF) {
+                   const text = new TextDecoder().decode(arrayBuffer);
+                   if (text.toLowerCase().includes("<html")) continue; 
+               }
+
+               const workbook = XLSX.read(arrayBuffer, { type: "array" });
+               const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+               const sheetData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+               
+               if (sheetData && sheetData.length > 0) {
+                  data = sheetData;
+                  success = true;
+                  break; // Stop trying proxies if one works
+               }
+            } catch (e) { console.warn("Proxy failed", proxy, e); }
+         }
       }
 
-      // Parse with XLSX
-      const workbook = XLSX.read(arrayBuffer, { type: "array" });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-
-      if (jsonData && jsonData.length > 0) {
-        const processed = jsonData.map(row => ({
-          ...row,
-          Target: Number(String(row["Target"] || "0").replace(/,/g, "")),
-          Achievement: Number(String(row["Achievement"] || row["Achivement"] || "0").replace(/,/g, "")),
-          ParsedDate: new Date(row["Date"] || row["Date/Time"]) 
-        }));
-        setRawData(processed);
+      if (success && data.length > 0) {
+          // Clean empty rows
+          data = data.filter(r => Object.keys(r).some(k => r[k] !== ""));
+          
+          const processed = data.map(row => ({
+            ...row,
+            Target: Number(String(row["Target"] || "0").replace(/,/g, "")),
+            Achievement: Number(String(row["Achievement"] || row["Achivement"] || "0").replace(/,/g, "")),
+            ParsedDate: new Date(row["Date"] || row["Date/Time"]) 
+          }));
+          setRawData(processed);
       } else {
-        setFetchError("Excel file empty hai ya data sahi format mein nahi hai.");
+          setFetchError("Sync fail ho gaya. Kripya check karein ki file Google Drive par 'Anyone with the link' (Public) par set ho.");
       }
       setLoading(false);
     } catch (err) {
-      setFetchError("Sync Error: " + err.message);
+      setFetchError("System Error: " + err.message);
       setLoading(false);
     }
   };
