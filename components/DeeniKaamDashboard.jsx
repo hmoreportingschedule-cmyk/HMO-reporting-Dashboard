@@ -48,20 +48,31 @@ const formatMonthYearLabel = (val) => {
   return date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
 };
 
-// Normalize date or month string from sheet to YYYY-MM for robust matching
 const parseRowMonth = (row) => {
-  let raw = row["Month"] || row["Date"] || "";
+  let raw = String(row["Month"] || row["Date"] || row["Report Date"] || "").trim();
   if (!raw) return "";
-  // If already YYYY-MM
+  
   if (/^\d{4}-\d{2}$/.test(raw)) return raw;
-  // If standard Date string or other formats
-  let d = new Date(raw);
-  if (!isNaN(d)) {
+
+  let parsed = Date.parse(raw);
+  if (!isNaN(parsed)) {
+    let d = new Date(parsed);
     let yr = d.getFullYear();
     let mo = String(d.getMonth() + 1).padStart(2, '0');
     return `${yr}-${mo}`;
   }
-  return raw.trim();
+
+  let lower = raw.toLowerCase();
+  const months = {jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'};
+  for (let m in months) {
+    if (lower.includes(m)) {
+      let matchYear = raw.match(/\d{4}/);
+      let yr = matchYear ? matchYear[0] : "2026";
+      return `${yr}-${months[m]}`;
+    }
+  }
+
+  return raw;
 };
 
 const MiniTable = ({ title, data }) => (
@@ -182,7 +193,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
   };
 
-  // Robust filtering including exact Single Month matching
   const filteredData = useMemo(() => {
     return rawData.filter((row) => {
       const matchRegion = !region || sameClient(row["Region"], region);
@@ -196,13 +206,13 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       const matchSearch = !searchTerm || JSON.stringify(row).toLowerCase().includes(searchTerm.toLowerCase().trim());
       
       let dateMatch = true;
-      const rMonth = row.NormalizedMonth || "";
+      const rMonth = row.NormalizedMonth || ""; 
       if (startMonth && endMonth) {
         if (rMonth && (rMonth < startMonth || rMonth > endMonth)) dateMatch = false;
       } else if (startMonth) {
-        if (rMonth && rMonth !== startMonth) dateMatch = false;
+        if (rMonth && !rMonth.includes(startMonth) && rMonth !== startMonth) dateMatch = false;
       } else if (endMonth) {
-        if (rMonth && rMonth !== endMonth) dateMatch = false;
+        if (rMonth && !rMonth.includes(endMonth) && rMonth !== endMonth) dateMatch = false;
       }
         
       return matchRegion && matchState && matchDivision && matchDistrict && matchActivity && matchSearch && dateMatch;
@@ -336,7 +346,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 </div>
               )}
 
-              {/* Tabs Selection */}
               <div className="flex gap-3 border-b border-slate-200 pb-2" data-html2canvas-ignore="true">
                 {["Monthly Report", "Average Report", "Quarterly Report"].map((tab) => (
                   <button
@@ -353,7 +362,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 ))}
               </div>
 
-              {/* Filters & Month Picker */}
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                 <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-5 border-b border-slate-100 pb-4">
                   <div className="flex items-center gap-3">
@@ -383,7 +391,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     </div>
                   </div>
 
-                  {/* Deeni Activities (Fields) Dropdown */}
                   <div className="flex flex-col flex-1 min-w-[130px]">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Deeni Activities</label>
                     <select value={selectedActivity} onChange={(e) => setSelectedActivity(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
