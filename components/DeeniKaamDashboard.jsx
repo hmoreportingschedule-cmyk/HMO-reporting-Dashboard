@@ -143,27 +143,12 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         const processed = combinedData.map(row => {
           let reportVal = Number(String(row["Report Value"] || row.report || "0").replace(/,/g, ""));
           let targetVal = Number(String(row["Target"] || "0").replace(/,/g, ""));
-          
-          let val1 = Number(String(row["Prev Month"] || reportVal * 0.85).replace(/,/g, ""));
-          let val2 = Number(String(row["Curr Month"] || reportVal).replace(/,/g, ""));
-          
-          let percentDiff = 0;
-          if (val1 !== 0) {
-            percentDiff = ((val2 - val1) / val1) * 100;
-          } else if (val2 > 0) {
-            percentDiff = 100;
-          }
-
-          let compStr = `${percentDiff >= 0 ? "+" : ""}${percentDiff.toFixed(1)}%`;
-
           return {
             ...row,
             Target: targetVal,
             Achievement: Number(String(row["Achievement"] || row["Achivement"] || "0").replace(/,/g, "")),
             NormalizedMonth: parseRowMonth(row),
-            Val1: val1,
-            Val2: val2,
-            CalculatedComparison: compStr
+            NumericReport: reportVal
           };
         });
         setRawData(processed);
@@ -201,69 +186,114 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return uniqValues(subset, "Fileds");
   }, [rawData, selectedCategory]);
 
-  const filteredData = useMemo(() => {
-    return rawData.filter((row) => {
+  // Build Month-Wise Lookup Map for exact startMonth and endMonth values per location & activity
+  const processedTableData = useMemo(() => {
+    // 1. Filter rawData based on global filters (region, state, division, district, category, field, search)
+    const baseFiltered = rawData.filter((row) => {
       const matchRegion = !region || sameClient(row["Region"], region);
       const matchState = !state || sameClient(row["State"], state);
       const matchDivision = !division || sameClient(row["Division"], division);
       const matchDistrict = !district || sameClient(row["District"], district);
-      
-      const catVal = row["Category"] || "";
-      const matchCat = !selectedCategory || sameClient(catVal, selectedCategory);
-
+      const matchCat = !selectedCategory || sameClient(row["Category"], selectedCategory);
       const fieldVal = row["Fileds"] || row["Fields"] || row["Deeni Activities"] || "";
       const matchField = !selectedField || sameClient(fieldVal, selectedField);
-
       const matchSearch = !searchTerm || JSON.stringify(row).toLowerCase().includes(searchTerm.toLowerCase().trim());
-      
-      let dateMatch = true;
-      const rMonth = row.NormalizedMonth || ""; 
-      if (startMonth && endMonth) {
-        if (rMonth && (rMonth < startMonth || rMonth > endMonth)) dateMatch = false;
-      } else if (startMonth) {
-        if (rMonth && !rMonth.includes(startMonth) && rMonth !== startMonth) dateMatch = false;
-      } else if (endMonth) {
-        if (rMonth && !rMonth.includes(endMonth) && rMonth !== endMonth) dateMatch = false;
-      }
-        
-      return matchRegion && matchState && matchDivision && matchDistrict && matchCat && matchField && matchSearch && dateMatch;
+      return matchRegion && matchState && matchDivision && matchDistrict && matchCat && matchField && matchSearch;
     });
-  }, [rawData, region, state, division, district, selectedCategory, selectedField, searchTerm, startMonth, endMonth]);
 
-  const processedTableData = useMemo(() => {
-    return filteredData.map(row => {
-      let v1 = Number(row.Val1 || 0);
-      let v2 = Number(row.Val2 || 0);
-      
+    // 2. Group unique rows by Region, State, Division, District, and Field (Deeni Activities)
+    const uniqueMap = {};
+    baseFiltered.forEach(row => {
+      const reg = String(row["Region"] || "").trim();
+      const st = String(row["State"] || "").trim();
+      const div = String(row["Division"] || "").trim();
+      const dist = String(row["District"] || "").trim();
+      const fld = String(row["Fileds"] || row["Fields"] || row["Deeni Activities"] || "").trim();
+      const key = `${reg}|${st}|${div}|${dist}|${fld}`;
+
+      if (!uniqueMap[key]) {
+        uniqueMap[key] = {
+          ...row,
+          Region: reg,
+          State: st,
+          Division: div,
+          District: dist,
+          Fileds: fld
+        };
+      }
+    });
+
+    // 3. For each unique row, calculate Val1 (startMonth), Val2 (endMonth), and accurate Percentage Comparison
+    return Object.values(uniqueMap).map(row => {
+      const reg = row.Region;
+      const st = row.State;
+      const div = row.Division;
+      const dist = row.District;
+      const fld = row.Fileds;
+
+      // Find report value for startMonth
+      let v1 = 0;
+      if (startMonth) {
+        const matchRow1 = rawData.find(r => 
+          sameClient(r["Region"], reg) && 
+          sameClient(r["State"], st) && 
+          sameClient(r["Division"], div) && 
+          sameClient(r["District"], dist) && 
+          sameClient(r["Fileds"] || r["Fields"] || "", fld) && 
+          r.NormalizedMonth === startMonth
+        );
+        v1 = matchRow1 ? matchRow1.NumericReport : 0;
+      } else {
+        v1 = row.NumericReport || 0;
+      }
+
+      // Find report value for endMonth
+      let v2 = 0;
+      if (endMonth) {
+        const matchRow2 = rawData.find(r => 
+          sameClient(r["Region"], reg) && 
+          sameClient(r["State"], st) && 
+          sameClient(r["Division"], div) && 
+          sameClient(r["District"], dist) && 
+          sameClient(r["Fileds"] || r["Fields"] || "", fld) && 
+          r.NormalizedMonth === endMonth
+        );
+        v2 = matchRow2 ? matchRow2.NumericReport : 0;
+      } else {
+        v2 = row.NumericReport || 0;
+      }
+
+      // Handle Tab calculations (Average / Quarterly)
       if (activeTab === "Average Report" || activeViewMode === "average") {
-        let avgVal = Math.round((v1 + v2) / 2);
         v1 = Math.round(v1 / 2);
         v2 = Math.round(v2 / 2);
-        row = { ...row, "Report Value": avgVal };
       } else if (activeTab === "Quarterly Report") {
-        let qVal = Math.round(((v1 + v2) / 2) * 3);
         v1 = v1 * 3;
         v2 = v2 * 3;
-        row = { ...row, "Report Value": qVal };
       }
 
-      // Recalculate accurate percentage comparison dynamically between v1 and v2
+      // Accurate Percentage Change Formula: ((v2 - v1) / v1) * 100
       let diffPercent = 0;
-      if (v1 !== 0) {
+      if (v1 > 0) {
         diffPercent = ((v2 - v1) / v1) * 100;
-      } else if (v2 > 0) {
+      } else if (v1 === 0 && v2 > 0) {
         diffPercent = 100;
+      } else if (v1 === 0 && v2 === 0) {
+        diffPercent = 0;
+      } else if (v1 > 0 && v2 === 0) {
+        diffPercent = -100;
       }
-      let compString = `${diffPercent >= 0 ? "+" : ""}${diffPercent.toFixed(1)}%`;
+
+      let compStr = `${diffPercent >= 0 ? "+" : ""}${diffPercent.toFixed(1)}%`;
 
       return {
         ...row,
         Val1: v1,
         Val2: v2,
-        CalculatedComparison: compString
+        CalculatedComparison: compStr
       };
     });
-  }, [filteredData, activeTab, activeViewMode]);
+  }, [rawData, region, state, division, district, selectedCategory, selectedField, searchTerm, startMonth, endMonth, activeTab, activeViewMode]);
 
   useEffect(() => { setCurrentPage(1); }, [searchTerm, region, state, division, district, selectedCategory, selectedField, startMonth, endMonth, activeTab, activeViewMode]);
 
