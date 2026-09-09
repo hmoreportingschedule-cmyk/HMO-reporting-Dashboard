@@ -93,8 +93,12 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     setFetchError("");
 
     try {
-      // User's Google Drive File ID
-      const fileId = "1xRe-BTJzHWq4IDw8x3YEfVrXsk_89rhU";
+      // Google Drive File ID URL se automatically extract hoga
+      const fileIdMatch = DEFAULT_SHEET_URL.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      const fileId = fileIdMatch ? fileIdMatch[1] : "";
+      if (!fileId) {
+        throw new Error("Invalid Google Drive file URL. Please paste a valid Drive file URL in DEFAULT_SHEET_URL.");
+      }
       const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
       
       // Use AllOrigins Proxy to bypass Google Drive CORS blocking
