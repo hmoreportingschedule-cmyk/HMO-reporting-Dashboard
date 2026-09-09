@@ -201,7 +201,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       const matchDivision = !division || sameClient(row["Division"], division);
       const matchDistrict = !district || sameClient(row["District"], district);
       
-      const fieldVal = row["Fields"] || row["Deeni Activities"] || "";
+      const fieldVal = row["Fileds"] || row["Fields"] || row["Deeni Activities"] || "";
       const matchField = !selectedField || sameClient(fieldVal, selectedField);
 
       const catVal = row["Category"] || "";
@@ -399,7 +399,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Deeni Activities</label>
                     <select value={selectedField} onChange={(e) => setSelectedField(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
                       <option value="">All Activities</option>
-                      {uniqValues(rawData, "Fields").map(fld => <option key={fld} value={fld}>{fld}</option>)}
+                      {uniqValues(rawData, "Fileds").map(fld => <option key={fld} value={fld}>{fld}</option>)}
                     </select>
                   </div>
 
@@ -510,12 +510,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["Division"] || "-"}</td>
                       <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["District"] || "-"}</td>
                       
-                      {/* Deeni Activities (Fields Column) */}
-                      <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100">{row["Fields"] || row["Deeni Activities"] || "-"}</td>
+                      {/* Deeni Activities (Fileds Column mapped correctly) */}
+                      <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100">{row["Fileds"] || row["Fields"] || row["Deeni Activities"] || "-"}</td>
                       
                       <td className="px-2 py-2 text-right font-extrabold text-teal-700 text-sm bg-teal-50/40 border-r border-slate-100">{row["Report Value"] || row.report || "0"}</td>
                       
-                      {/* Month Column Value */}
                       <td className="px-2 py-2 text-slate-600 text-center border-r border-slate-100">{row["Month"] || "-"}</td>
                       
                       <td className="px-2 py-2 text-slate-600 text-right border-r border-slate-100">{row["Target"] || "-"}</td>
