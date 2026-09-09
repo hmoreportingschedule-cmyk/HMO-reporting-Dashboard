@@ -93,13 +93,13 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     setFetchError("");
 
     try {
-      const fileIdMatch = sheetUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      const fileIdMatch = DEFAULT_SHEET_URL.match(/\/d\/([a-zA-Z0-9_-]+)/);
       const fileId = fileIdMatch ? fileIdMatch[1] : "1xRe-BTJzHWq4IDw8x3YEfVrXsk_89rhU";
       
       let success = false;
       let data = [];
 
-      // Approach 1: Native GViz CSV Export (Fastest, Bypass CORS internally on Google's end)
+      // 1. Google Sheets GViz Attempt
       try {
         const gvizUrl = `https://docs.google.com/spreadsheets/d/${fileId}/gviz/tq?tqx=out:csv`;
         const res = await fetch(gvizUrl);
@@ -111,25 +111,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
               success = true;
            }
         }
-      } catch (e) { console.warn("GViz failed", e); }
+      } catch (e) {}
 
-      // Approach 2: Direct CSV Export
-      if (!success) {
-        try {
-          const csvUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=csv`;
-          const res = await fetch(csvUrl);
-          const text = await res.text();
-          if (res.ok && !text.toLowerCase().includes("<html")) {
-             const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-             if (parsed.data && parsed.data.length > 0) {
-                data = parsed.data;
-                success = true;
-             }
-          }
-        } catch (e) { console.warn("CSV Export failed", e); }
-      }
-
-      // Approach 3: Fallback to Multiple Proxies + SheetJS (For raw Excel files blocking CSV export)
+      // 2. Google Drive XLSX Binary via Proxies
       if (!success) {
          const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`;
          const proxies = [
@@ -145,30 +129,43 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                
                const arrayBuffer = await res.arrayBuffer();
                
-               // Prevent parsing HTML error pages (like virus warning)
+               // Check if response is HTML (Virus Scan Warning)
                const uint8View = new Uint8Array(arrayBuffer);
                if (uint8View[0] !== 0x50 && uint8View[0] !== 0xEF) {
                    const text = new TextDecoder().decode(arrayBuffer);
-                   if (text.toLowerCase().includes("<html")) continue; 
+                   if (text.toLowerCase().includes("<html")) {
+                       const tokenMatch = text.match(/confirm=([a-zA-Z0-9_-]+)/);
+                       if (tokenMatch) {
+                           const token = tokenMatch[1];
+                           const bypassUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=${token}`;
+                           const bypassProxy = proxy.replace(encodeURIComponent(driveUrl), encodeURIComponent(bypassUrl));
+                           const bypassRes = await fetch(bypassProxy);
+                           if (bypassRes.ok) {
+                               const bypassBuffer = await bypassRes.arrayBuffer();
+                               const workbook = XLSX.read(bypassBuffer, { type: "array" });
+                               const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                               data = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                               if (data.length > 0) { success = true; break; }
+                           }
+                       }
+                       continue;
+                   }
                }
 
                const workbook = XLSX.read(arrayBuffer, { type: "array" });
                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-               const sheetData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+               data = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
                
-               if (sheetData && sheetData.length > 0) {
-                  data = sheetData;
+               if (data && data.length > 0) {
                   success = true;
-                  break; // Stop trying proxies if one works
+                  break; 
                }
-            } catch (e) { console.warn("Proxy failed", proxy, e); }
+            } catch (e) { console.warn("Proxy attempt failed"); }
          }
       }
 
       if (success && data.length > 0) {
-          // Clean empty rows
           data = data.filter(r => Object.keys(r).some(k => r[k] !== ""));
-          
           const processed = data.map(row => ({
             ...row,
             Target: Number(String(row["Target"] || "0").replace(/,/g, "")),
@@ -177,7 +174,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
           }));
           setRawData(processed);
       } else {
-          setFetchError("Sync fail ho gaya. Kripya check karein ki file Google Drive par 'Anyone with the link' (Public) par set ho.");
+          setFetchError("File bohot badi hai ya proxies usay block kar rahi hain. (Free proxies ki size limit hoti hai). Kripya file ka data kam karein ya CSV use karein.");
       }
       setLoading(false);
     } catch (err) {
