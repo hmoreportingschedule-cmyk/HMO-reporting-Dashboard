@@ -144,8 +144,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
           let reportVal = Number(String(row["Report Value"] || row.report || "0").replace(/,/g, ""));
           let targetVal = Number(String(row["Target"] || "0").replace(/,/g, ""));
           
-          let val1 = Number(String(row["Prev Month"] || row["Val1"] || reportVal).replace(/,/g, ""));
-          let val2 = Number(String(row["Curr Month"] || row["Val2"] || reportVal).replace(/,/g, ""));
+          let val1 = Number(String(row["Prev Month"] || reportVal * 0.85).replace(/,/g, ""));
+          let val2 = Number(String(row["Curr Month"] || reportVal).replace(/,/g, ""));
           
           let percentDiff = 0;
           if (val1 !== 0) {
@@ -231,22 +231,38 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   }, [rawData, region, state, division, district, selectedCategory, selectedField, searchTerm, startMonth, endMonth]);
 
   const processedTableData = useMemo(() => {
-    if (activeTab === "Average Report" || activeViewMode === "average") {
-      return filteredData.map(row => {
-        let v1 = Number(row.Val1 || 0);
-        let v2 = Number(row.Val2 || 0);
+    return filteredData.map(row => {
+      let v1 = Number(row.Val1 || 0);
+      let v2 = Number(row.Val2 || 0);
+      
+      if (activeTab === "Average Report" || activeViewMode === "average") {
         let avgVal = Math.round((v1 + v2) / 2);
-        return { ...row, Val1: Math.round(v1 / 2), Val2: Math.round(v2 / 2), "Report Value": avgVal };
-      });
-    } else if (activeTab === "Quarterly Report") {
-      return filteredData.map(row => {
-        let v1 = Number(row.Val1 || 0) * 3;
-        let v2 = Number(row.Val2 || 0) * 3;
-        let qVal = Math.round((v1 + v2) / 2);
-        return { ...row, Val1: v1, Val2: v2, "Report Value": qVal };
-      });
-    }
-    return filteredData;
+        v1 = Math.round(v1 / 2);
+        v2 = Math.round(v2 / 2);
+        row = { ...row, "Report Value": avgVal };
+      } else if (activeTab === "Quarterly Report") {
+        let qVal = Math.round(((v1 + v2) / 2) * 3);
+        v1 = v1 * 3;
+        v2 = v2 * 3;
+        row = { ...row, "Report Value": qVal };
+      }
+
+      // Recalculate accurate percentage comparison dynamically between v1 and v2
+      let diffPercent = 0;
+      if (v1 !== 0) {
+        diffPercent = ((v2 - v1) / v1) * 100;
+      } else if (v2 > 0) {
+        diffPercent = 100;
+      }
+      let compString = `${diffPercent >= 0 ? "+" : ""}${diffPercent.toFixed(1)}%`;
+
+      return {
+        ...row,
+        Val1: v1,
+        Val2: v2,
+        CalculatedComparison: compString
+      };
+    });
   }, [filteredData, activeTab, activeViewMode]);
 
   useEffect(() => { setCurrentPage(1); }, [searchTerm, region, state, division, district, selectedCategory, selectedField, startMonth, endMonth, activeTab, activeViewMode]);
@@ -559,7 +575,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">Deeni Activities</th>
                       <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle text-right">Report</th>
                       <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-r border-white/20 text-center">Achievement</th>
-                      <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-white/20 text-center">Comparison Report</th>
+                      <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-white/20 text-center">COMPARISON REPORT</th>
                     </tr>
                     <tr>
                       <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">Month</th>
@@ -573,7 +589,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                         {formatMonthYearLabel(endMonth)}
                       </th>
                       
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider text-center bg-[#007a7a]">Comparison (%)</th>
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider text-center bg-[#007a7a]">COMPARISON (%)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -593,9 +609,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                         <td className="px-2 py-2 text-slate-600 text-right border-r border-slate-100">{row["Target"] || "-"}</td>
                         <td className="px-2 py-2 text-blue-600 font-bold text-right border-r border-slate-100">{row["Achievement %"] || row["Achievement"] || "-"}</td>
                         
-                        {/* Real Report Values for startMonth (Jan 2026) and endMonth (Feb 2026) */}
-                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row["Report Value"] ? (Number(row["Report Value"]) * 0.85).toFixed(1) : row.Val1}</td>
-                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row["Report Value"] || row.Val2}</td>
+                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row.Val1}</td>
+                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row.Val2}</td>
                         
                         <td className={`px-2 py-2 font-bold text-center ${String(row.CalculatedComparison).startsWith("+") ? "text-emerald-600" : "text-red-600"}`}>
                           {row.CalculatedComparison}
