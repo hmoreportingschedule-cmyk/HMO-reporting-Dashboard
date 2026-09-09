@@ -7,7 +7,7 @@ import pptxgen from "pptxgenjs";
 import html2canvas from "html2canvas";
 
 // ⚠️ YAHAN DEENI KAAM KI GOOGLE SHEET KA CSV LINK PASTE KAREIN
-const DEFAULT_SHEET_URL = "https://drive.google.com/file/d/1ef47ga612D1gXxvkd7uE-AOjr5jd0Q2t/view?usp=sharing";
+const DEFAULT_SHEET_URL = "https://drive.google.com/file/d/1xRe-BTJzHWq4IDw8x3YEfVrXsk_89rhU/view?usp=sharing";
 
 const sameClient = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
@@ -93,13 +93,13 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     setFetchError("");
 
     try {
-      const fileIdMatch = DEFAULT_SHEET_URL.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      const fileIdMatch = sheetUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
       const fileId = fileIdMatch ? fileIdMatch[1] : "1xRe-BTJzHWq4IDw8x3YEfVrXsk_89rhU";
       
       let success = false;
       let data = [];
 
-      // 1. Google Sheets GViz Attempt
+      // Approach 1: Native GViz CSV Export (Fastest, Bypass CORS internally on Google's end)
       try {
         const gvizUrl = `https://docs.google.com/spreadsheets/d/${fileId}/gviz/tq?tqx=out:csv`;
         const res = await fetch(gvizUrl);
@@ -111,9 +111,25 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
               success = true;
            }
         }
-      } catch (e) {}
+      } catch (e) { console.warn("GViz failed", e); }
 
-      // 2. Google Drive XLSX Binary via Proxies
+      // Approach 2: Direct CSV Export
+      if (!success) {
+        try {
+          const csvUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=csv`;
+          const res = await fetch(csvUrl);
+          const text = await res.text();
+          if (res.ok && !text.toLowerCase().includes("<html")) {
+             const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+             if (parsed.data && parsed.data.length > 0) {
+                data = parsed.data;
+                success = true;
+             }
+          }
+        } catch (e) { console.warn("CSV Export failed", e); }
+      }
+
+      // Approach 3: Fallback to Multiple Proxies + SheetJS (For raw Excel files blocking CSV export)
       if (!success) {
          const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`;
          const proxies = [
@@ -129,43 +145,30 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                
                const arrayBuffer = await res.arrayBuffer();
                
-               // Check if response is HTML (Virus Scan Warning)
+               // Prevent parsing HTML error pages (like virus warning)
                const uint8View = new Uint8Array(arrayBuffer);
                if (uint8View[0] !== 0x50 && uint8View[0] !== 0xEF) {
                    const text = new TextDecoder().decode(arrayBuffer);
-                   if (text.toLowerCase().includes("<html")) {
-                       const tokenMatch = text.match(/confirm=([a-zA-Z0-9_-]+)/);
-                       if (tokenMatch) {
-                           const token = tokenMatch[1];
-                           const bypassUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=${token}`;
-                           const bypassProxy = proxy.replace(encodeURIComponent(driveUrl), encodeURIComponent(bypassUrl));
-                           const bypassRes = await fetch(bypassProxy);
-                           if (bypassRes.ok) {
-                               const bypassBuffer = await bypassRes.arrayBuffer();
-                               const workbook = XLSX.read(bypassBuffer, { type: "array" });
-                               const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                               data = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-                               if (data.length > 0) { success = true; break; }
-                           }
-                       }
-                       continue;
-                   }
+                   if (text.toLowerCase().includes("<html")) continue; 
                }
 
                const workbook = XLSX.read(arrayBuffer, { type: "array" });
                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-               data = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+               const sheetData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
                
-               if (data && data.length > 0) {
+               if (sheetData && sheetData.length > 0) {
+                  data = sheetData;
                   success = true;
-                  break; 
+                  break; // Stop trying proxies if one works
                }
-            } catch (e) { console.warn("Proxy attempt failed"); }
+            } catch (e) { console.warn("Proxy failed", proxy, e); }
          }
       }
 
       if (success && data.length > 0) {
+          // Clean empty rows
           data = data.filter(r => Object.keys(r).some(k => r[k] !== ""));
+          
           const processed = data.map(row => ({
             ...row,
             Target: Number(String(row["Target"] || "0").replace(/,/g, "")),
@@ -174,7 +177,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
           }));
           setRawData(processed);
       } else {
-          setFetchError("File bohot badi hai ya proxies usay block kar rahi hain. (Free proxies ki size limit hoti hai). Kripya file ka data kam karein ya CSV use karein.");
+          setFetchError("Sync fail ho gaya. Kripya check karein ki file Google Drive par 'Anyone with the link' (Public) par set ho.");
       }
       setLoading(false);
     } catch (err) {
@@ -186,14 +189,13 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const setYTD = () => {
     const today = new Date();
     const startOfYear = new Date(today.getFullYear(), 0, 1);
-    const formatDate = (d) => {
-        let month = '' + (d.getMonth() + 1), day = '' + d.getDate(), year = d.getFullYear();
+    const formatMonth = (d) => {
+        let month = '' + (d.getMonth() + 1), year = d.getFullYear();
         if (month.length < 2) month = '0' + month;
-        if (day.length < 2) day = '0' + day;
-        return [year, month, day].join('-');
+        return [year, month].join('-');
     };
-    setStartDate(formatDate(startOfYear));
-    setEndDate(formatDate(today));
+    setStartDate(formatMonth(startOfYear));
+    setEndDate(formatMonth(today));
   };
 
   // Handlers for dependent dropdowns
@@ -228,9 +230,12 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       if (startDate || endDate) {
         const rowDate = row.ParsedDate;
         if (!isNaN(rowDate)) {
-            const start = startDate ? new Date(startDate) : new Date("1900-01-01");
-            const end = endDate ? new Date(endDate) : new Date("2100-01-01");
-            end.setHours(23, 59, 59, 999);
+            const start = startDate ? new Date(startDate + "-01T00:00:00") : new Date("1900-01-01T00:00:00");
+            let end = new Date("2100-01-01T23:59:59");
+            if (endDate) {
+                const [ey, em] = endDate.split('-');
+                end = new Date(ey, em, 0, 23, 59, 59, 999);
+            }
             dateMatch = rowDate >= start && rowDate <= end;
         }
       }
@@ -402,9 +407,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
               )}
 
               {/* KPIs (Kept Original 12 Deeni Kaam KPIs) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 gap-6">
                 {[
-                  { title: "Total Submitted", val: kpiStats.totalReports, icon: LayoutDashboard },
                   { title: "Report Quantity", val: kpiStats.totalReportSum, icon: Activity },
                   { title: "Total Masajid", val: kpiStats.totalMasjid, icon: MapPin },
                   { title: "Active Muballigh", val: kpiStats.totalMuballigh, icon: User }
@@ -412,7 +416,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   <div key={idx} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
                     <div className="relative flex justify-between items-center z-10">
                       <div className="flex items-center gap-4">
-                          <div className={`p-4 rounded-xl ${idx < 2 ? 'bg-amber-50 text-amber-500 border-amber-100' : 'bg-teal-50 text-teal-600 border-teal-100'} border`}>
+                          <div className={`p-4 rounded-xl ${idx === 0 ? 'bg-amber-50 text-amber-500 border-amber-100' : 'bg-teal-50 text-teal-600 border-teal-100'} border`}>
                             <kpi.icon className="w-6 h-6" />
                           </div>
                           <div>
@@ -437,9 +441,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                      <button onClick={setYTD} className="px-3 py-2 text-[10px] font-bold tracking-widest uppercase bg-teal-50 text-teal-700 rounded-lg border border-teal-200 hover:bg-teal-100 transition-colors">YTD (Year to Date)</button>
                      <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200">
                         <Calendar className="w-4 h-4 text-slate-400 ml-2" />
-                        <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="bg-transparent text-xs font-bold text-slate-700 outline-none" />
+                        <input type="month" value={startDate} onChange={e=>setStartDate(e.target.value)} className="bg-transparent text-xs font-bold text-slate-700 outline-none" />
                         <span className="text-slate-400 text-xs font-bold">TO</span>
-                        <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="bg-transparent text-xs font-bold text-slate-700 outline-none pr-2" />
+                        <input type="month" value={endDate} onChange={e=>setEndDate(e.target.value)} className="bg-transparent text-xs font-bold text-slate-700 outline-none pr-2" />
                      </div>
                   </div>
                 </div>
