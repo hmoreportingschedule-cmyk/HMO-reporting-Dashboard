@@ -5,7 +5,6 @@ export default function DeeniKaamDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // BigQuery se live data fetch karne ke liye
   useEffect(() => {
     fetch('/api/deeni-data')
       .then((res) => res.json())
