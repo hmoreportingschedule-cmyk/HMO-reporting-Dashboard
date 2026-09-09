@@ -48,6 +48,22 @@ const formatMonthYearLabel = (val) => {
   return date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
 };
 
+// Normalize date or month string from sheet to YYYY-MM for robust matching
+const parseRowMonth = (row) => {
+  let raw = row["Month"] || row["Date"] || "";
+  if (!raw) return "";
+  // If already YYYY-MM
+  if (/^\d{4}-\d{2}$/.test(raw)) return raw;
+  // If standard Date string or other formats
+  let d = new Date(raw);
+  if (!isNaN(d)) {
+    let yr = d.getFullYear();
+    let mo = String(d.getMonth() + 1).padStart(2, '0');
+    return `${yr}-${mo}`;
+  }
+  return raw.trim();
+};
+
 const MiniTable = ({ title, data }) => (
   <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[340px]">
     <div className="p-4 border-b border-slate-100">
@@ -87,7 +103,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [state, setState] = useState(officeUser?.state && officeUser.state.toLowerCase() !== "all" ? officeUser.state : "");
   const [division, setDivision] = useState(officeUser?.division && officeUser.division.toLowerCase() !== "all" ? officeUser.division : "");
   const [district, setDistrict] = useState(officeUser?.district && officeUser.district.toLowerCase() !== "all" ? officeUser.district : "");
-  const [selectedActivity, setSelectedActivity] = useState(""); // Deeni Activities Filter
+  const [selectedActivity, setSelectedActivity] = useState(""); 
   
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -133,7 +149,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
             ...row,
             Target: targetVal,
             Achievement: Number(String(row["Achievement"] || row["Achivement"] || "0").replace(/,/g, "")),
-            ParsedDate: new Date(row["Date"] || "2026-01-01"),
+            NormalizedMonth: parseRowMonth(row),
             Val1: val1,
             Val2: val2,
             CalculatedComparison: compStr
@@ -166,7 +182,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
   };
 
-  // Filter Logic with Deeni Activities (Fields) & Month mapping
+  // Robust filtering including exact Single Month matching
   const filteredData = useMemo(() => {
     return rawData.filter((row) => {
       const matchRegion = !region || sameClient(row["Region"], region);
@@ -180,10 +196,13 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       const matchSearch = !searchTerm || JSON.stringify(row).toLowerCase().includes(searchTerm.toLowerCase().trim());
       
       let dateMatch = true;
-      const rowMonth = row["Month"] || ""; 
-      if (startMonth || endMonth) {
-        if (startMonth && rowMonth && rowMonth < startMonth) dateMatch = false;
-        if (endMonth && rowMonth && rowMonth > endMonth) dateMatch = false;
+      const rMonth = row.NormalizedMonth || "";
+      if (startMonth && endMonth) {
+        if (rMonth && (rMonth < startMonth || rMonth > endMonth)) dateMatch = false;
+      } else if (startMonth) {
+        if (rMonth && rMonth !== startMonth) dateMatch = false;
+      } else if (endMonth) {
+        if (rMonth && rMonth !== endMonth) dateMatch = false;
       }
         
       return matchRegion && matchState && matchDivision && matchDistrict && matchActivity && matchSearch && dateMatch;
@@ -227,7 +246,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
 
   const downloadExcel = () => {
     if (!processedTableData.length) return alert("No data to export");
-    const exportData = processedTableData.map(x => { let r = { ...x }; delete r.ParsedDate; return r; });
+    const exportData = processedTableData.map(x => { let r = { ...x }; delete r.NormalizedMonth; return r; });
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Deeni Kaam Data");
