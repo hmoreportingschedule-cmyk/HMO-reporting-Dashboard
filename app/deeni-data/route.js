@@ -16,3 +16,6 @@ export async function GET() {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+```[cite: 2]
+
+Jaise hi aap is correct path par `route.js` file upload karenge, Vercel ka build successful hote hi yeh JSON error 100% khatam ho jayega aur live data screen par show hone lagega!
