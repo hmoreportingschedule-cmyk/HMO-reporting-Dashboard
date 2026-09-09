@@ -7,7 +7,7 @@ import pptxgen from "pptxgenjs";
 import html2canvas from "html2canvas";
 
 // ⚠️ YAHAN DEENI KAAM KI GOOGLE SHEET KA CSV LINK PASTE KAREIN
-const DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/11vxT6LyLIcRNjOAWJZPpmdN0Erz8xj-G/edit?usp=sharing&ouid=112333571857066993163&rtpof=true&sd=true";
+const DEFAULT_SHEET_URL = "https://drive.google.com/uc?export=download&id=1xRe-BTJzHWq4IDw8x3YEfVrXsk_89rhU";
 
 const sameClient = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
@@ -88,17 +88,23 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     }
   }, []);
 
-  const fetchData = async () => {
-    if (!sheetUrl) {
-      setFetchError("System Error: No valid data source provided.");
-      return;
-    }
+    const fetchData = async () => {
+    if (!sheetUrl) return;
     setLoading(true);
     setFetchError("");
 
     try {
-      Papa.parse(sheetUrl, {
-        download: true,
+      // Google Drive CSVs need a CORS proxy to be read directly in the browser
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(sheetUrl)}`;
+      const response = await fetch(proxyUrl);
+      
+      if (!response.ok) {
+        throw new Error("Google Drive connection blocked or file is not public.");
+      }
+      
+      const csvText = await response.text();
+
+      Papa.parse(csvText, {
         header: true,
         skipEmptyLines: true,
         complete: (results) => {
@@ -107,21 +113,21 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
               ...row,
               Target: Number(String(row["Target"] || "0").replace(/,/g, "")),
               Achievement: Number(String(row["Achievement"] || row["Achivement"] || "0").replace(/,/g, "")),
-              ParsedDate: new Date(row["Date"]) 
+              ParsedDate: new Date(row["Date"] || row["Date/Time"]) 
             }));
             setRawData(processed);
           } else {
-            setFetchError("Data stream empty or connection lost.");
+            setFetchError("Data stream empty. CSV file might be empty.");
           }
           setLoading(false);
         },
         error: (err) => {
-          setFetchError("Connection Failed. Verify secure CSV link.");
+          setFetchError("Failed to parse CSV format.");
           setLoading(false);
         },
       });
     } catch (err) {
-      setFetchError("Network latency issue.");
+      setFetchError("Connection Failed: " + err.message);
       setLoading(false);
     }
   };
