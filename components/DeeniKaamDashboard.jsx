@@ -1,12 +1,11 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
 import Papa from "papaparse";
-import { LogOut, RefreshCw, Filter, Layers, Calendar, MapPin, Search, Activity, ArrowLeft, User, Presentation, Download, BookOpenCheck, Image as ImageIcon, LayoutDashboard , Clock} from "lucide-react";
+import { LogOut, RefreshCw, Filter, Calendar, MapPin, Search, Activity, ArrowLeft, Download, BookOpenCheck, Image as ImageIcon, Clock } from "lucide-react";
 import * as XLSX from "xlsx";
 import pptxgen from "pptxgenjs";
 import html2canvas from "html2canvas";
 
-// ⚠️ APNI SAARI GOOGLE SHEETS KE CSV EXPORT URLS YAHAN ADD KAREIN (FUTURE MEIN NAYI FILES BHI YAHAN DAL SAKTE HAIN)
 const SHEET_URLS = [
   "https://docs.google.com/spreadsheets/d/1P1Ul-jXOfFfhuQLTKeQ-zOynKnCmywH-_gjZ9nJ8tO0/export?format=csv",
   "https://docs.google.com/spreadsheets/d/1S2tEIyaN8p-yu4Vd_GVumqBqwzgTzM3zlms4DwCJr00/export?format=csv",
@@ -19,13 +18,8 @@ const parseSheet = (url) => {
       download: true,
       header: true,
       skipEmptyLines: true,
-      complete: (results) => {
-        resolve(results.data || []);
-      },
-      error: (err) => {
-        console.error("Error fetching sheet:", url, err);
-        resolve([]);
-      }
+      complete: (results) => resolve(results.data || []),
+      error: () => resolve([])
     });
   });
 };
@@ -77,10 +71,13 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState("");
 
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  // Report View Tab State
+  const [activeTab, setActiveTab] = useState("Monthly Report"); // Monthly Report | Average Report | Quarterly Report
+
+  // Month-Year Range States
+  const [startMonth, setStartMonth] = useState("");
+  const [endMonth, setEndMonth] = useState("");
   
-  // Dependent Dropdown States
   const [region, setRegion] = useState(officeUser?.region && officeUser.region.toLowerCase() !== "all" ? officeUser.region : "");
   const [state, setState] = useState(officeUser?.state && officeUser.state.toLowerCase() !== "all" ? officeUser.state : "");
   const [division, setDivision] = useState(officeUser?.division && officeUser.division.toLowerCase() !== "all" ? officeUser.division : "");
@@ -107,19 +104,24 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const fetchData = async () => {
     setLoading(true);
     setFetchError("");
-
     try {
-      const promises = SHEET_URLS.map(url => parseSheet(url));
-      const resultsArray = await Promise.all(promises);
+      const resultsArray = await Promise.all(SHEET_URLS.map(url => parseSheet(url)));
       const combinedData = resultsArray.flat();
-
       if (combinedData.length > 0) {
-        const processed = combinedData.map(row => ({
-          ...row,
-          Target: Number(String(row["Target"] || "0").replace(/,/g, "")),
-          Achievement: Number(String(row["Achievement"] || row["Achivement"] || "0").replace(/,/g, "")),
-          ParsedDate: new Date(row["Date"]) 
-        }));
+        const processed = combinedData.map(row => {
+          let reportVal = Number(String(row["Report Value"] || row.report || "0").replace(/,/g, ""));
+          let targetVal = Number(String(row["Target"] || "0").replace(/,/g, ""));
+          let prevVal = Number(String(row["Prev Month"] || "0").replace(/,/g, ""));
+          let currVal = Number(String(row["Curr Month"] || reportVal).replace(/,/g, ""));
+          let diff = currVal - prevVal;
+          return {
+            ...row,
+            Target: targetVal,
+            Achievement: Number(String(row["Achievement"] || row["Achivement"] || "0").replace(/,/g, "")),
+            ParsedDate: new Date(row["Date"] || "2026-01-01"),
+            CalculatedComparison: diff > 0 ? `+${diff}` : `${diff}`
+          };
+        });
         setRawData(processed);
       } else {
         setFetchError("Data stream empty or connection lost.");
@@ -131,20 +133,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     }
   };
 
-  const setYTD = () => {
-    const today = new Date();
-    const startOfYear = new Date(today.getFullYear(), 0, 1);
-    const formatDate = (d) => {
-        let month = '' + (d.getMonth() + 1), day = '' + d.getDate(), year = d.getFullYear();
-        if (month.length < 2) month = '0' + month;
-        if (day.length < 2) day = '0' + day;
-        return [year, month, day].join('-');
-    };
-    setStartDate(formatDate(startOfYear));
-    setEndDate(formatDate(today));
-  };
-
-  // Handlers for dependent dropdowns
   const handleSetRegion = (v) => {
     setRegion(v);
     if(!(officeUser?.state && officeUser.state.toLowerCase() !== "all")) setState("");
@@ -168,46 +156,26 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       const matchDivision = !division || sameClient(row["Division"], division);
       const matchDistrict = !district || sameClient(row["District"], district);
       const matchCategory = !selectedCategory || sameClient(row["Category"] || row["Fields"], selectedCategory);
+      const matchSearch = !searchTerm || JSON.stringify(row).toLowerCase().includes(searchTerm.toLowerCase().trim());
       
-      const matchSearch = !searchTerm || 
-        JSON.stringify(row).toLowerCase().includes(searchTerm.toLowerCase().trim());
-        
       let dateMatch = true;
-      if (startDate || endDate) {
-        const rowDate = row.ParsedDate;
-        if (!isNaN(rowDate)) {
-            const start = startDate ? new Date(startDate) : new Date("1900-01-01");
-            const end = endDate ? new Date(endDate) : new Date("2100-01-01");
-            end.setHours(23, 59, 59, 999);
-            dateMatch = rowDate >= start && rowDate <= end;
-        }
+      if (startMonth || endMonth) {
+        const rowMonth = row["Month"] || ""; // assuming row has Month format like YYYY-MM or similar text
+        if (startMonth && rowMonth && rowMonth < startMonth) dateMatch = false;
+        if (endMonth && rowMonth && rowMonth > endMonth) dateMatch = false;
       }
         
       return matchRegion && matchState && matchDivision && matchDistrict && matchCategory && matchSearch && dateMatch;
     });
-  }, [rawData, region, state, division, district, selectedCategory, searchTerm, startDate, endDate]);
+  }, [rawData, region, state, division, district, selectedCategory, searchTerm, startMonth, endMonth]);
 
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, region, state, division, district, selectedCategory, startDate, endDate]);
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, region, state, division, district, selectedCategory, startMonth, endMonth]);
 
   const pagedRows = useMemo(() => {
     const start = (currentPage - 1) * rowsPerPage;
     return filteredData.slice(start, start + rowsPerPage);
   }, [filteredData, currentPage]);
 
-  const kpiStats = useMemo(() => {
-    let totalMuballigh = 0, totalMasjid = 0, totalHalqe = 0, totalReportSum = 0;
-    filteredData.forEach((item) => {
-      const field = item["Fields"]?.trim().toLowerCase() || "";
-      const val = parseFloat(item["Report Value"] || item.report) || 0;
-      totalReportSum += val;
-      if (field.includes("total active muballigh")) totalMuballigh += val;
-      if (field.includes("total masjid")) totalMasjid += val;
-      if (field.includes("total zeili halqe")) totalHalqe += val;
-    });
-    return { totalMuballigh, totalMasjid, totalHalqe, totalReportSum, totalReports: filteredData.length };
-  }, [filteredData]);
-
-  // Dynamic Graph Logic
   const { dynamicGraphData, dynamicGraphTitle } = useMemo(() => {
     if (division) return { dynamicGraphData: groupCount(filteredData, "District"), dynamicGraphTitle: "REPORTS BY DISTRICT" };
     if (state) return { dynamicGraphData: groupCount(filteredData, "Division"), dynamicGraphTitle: "REPORTS BY DIVISION" };
@@ -219,11 +187,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
 
   const downloadExcel = () => {
     if (!filteredData.length) return alert("No data to export");
-    const exportData = filteredData.map(x => {
-        let rowCopy = { ...x };
-        delete rowCopy.ParsedDate;
-        return rowCopy;
-    });
+    const exportData = filteredData.map(x => { let r = { ...x }; delete r.ParsedDate; return r; });
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Deeni Kaam Data");
@@ -236,36 +200,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     let slide1 = pres.addSlide();
     slide1.background = { color: "ffffff" };
     slide1.addText("12 DEENI KAAM REPORT", { x: 1, y: 2, w: 8, fontSize: 36, bold: true, color: "008080", align: "center" });
-    slide1.addText(`User: ${officeUser?.name || officeUser?.userId || "Admin"}`, { x: 1, y: 3, w: 8, fontSize: 16, color: "334155", align: "center" });
-    slide1.addText(`Generated on: ${new Date().toLocaleDateString()}`, { x: 1, y: 3.5, w: 8, fontSize: 12, color: "64748b", align: "center" });
-
-    let slide2 = pres.addSlide();
-    slide2.background = { color: "ffffff" };
-    slide2.addText("Key Performance Indicators", { x: 0.5, y: 0.5, w: 9, fontSize: 24, bold: true, color: "0f766e" });
-    
-    slide2.addShape(pres.ShapeType.rect, { x: 0.5, y: 1.5, w: 4, h: 1.5, fill: "f8fafc", line: {color: "008080", width: 1} });
-    slide2.addText("TOTAL MUBALLIGH", { x: 0.5, y: 1.7, w: 4, fontSize: 12, color: "64748b", align: "center" });
-    slide2.addText(kpiStats.totalMuballigh.toLocaleString("en-IN"), { x: 0.5, y: 2.2, w: 4, fontSize: 28, bold: true, color: "0f766e", align: "center" });
-
-    slide2.addShape(pres.ShapeType.rect, { x: 5.5, y: 1.5, w: 4, h: 1.5, fill: "f8fafc", line: {color: "008080", width: 1} });
-    slide2.addText("TOTAL MASAJID", { x: 5.5, y: 1.7, w: 4, fontSize: 12, color: "64748b", align: "center" });
-    slide2.addText(kpiStats.totalMasjid.toLocaleString("en-IN"), { x: 5.5, y: 2.2, w: 4, fontSize: 28, bold: true, color: "0f766e", align: "center" });
-
-    slide2.addShape(pres.ShapeType.rect, { x: 0.5, y: 3.5, w: 4, h: 1.5, fill: "f8fafc", line: {color: "008080", width: 1} });
-    slide2.addText("ZEILI HALQE", { x: 0.5, y: 3.7, w: 4, fontSize: 12, color: "64748b", align: "center" });
-    slide2.addText(kpiStats.totalHalqe.toLocaleString("en-IN"), { x: 0.5, y: 4.2, w: 4, fontSize: 28, bold: true, color: "0f766e", align: "center" });
-
-    slide2.addShape(pres.ShapeType.rect, { x: 5.5, y: 3.5, w: 4, h: 1.5, fill: "f8fafc", line: {color: "008080", width: 1} });
-    slide2.addText("SYSTEM RECORDS", { x: 5.5, y: 3.7, w: 4, fontSize: 12, color: "64748b", align: "center" });
-    slide2.addText(kpiStats.totalReports.toLocaleString("en-IN"), { x: 5.5, y: 4.2, w: 4, fontSize: 28, bold: true, color: "0f766e", align: "center" });
-
-    if (dynamicGraphData.length > 0) {
-        let slide3 = pres.addSlide();
-        slide3.background = { color: "ffffff" };
-        slide3.addText(dynamicGraphTitle, { x: 0.5, y: 0.5, w: 9, fontSize: 24, bold: true, color: "0f766e" });
-        let chartData = [{ name: "Reports", labels: dynamicGraphData.slice(0, 8).map(d => d.label || "Unknown"), values: dynamicGraphData.slice(0, 8).map(d => d.count) }];
-        slide3.addChart(pres.ChartType.bar, chartData, { x: 0.5, y: 1.2, w: 9, h: 3.5, barDir: "col", chartColors: ["008080"], valAxisLabelColor: "475569", catAxisLabelColor: "475569", showLegend: false });
-    }
     pres.writeFile({ fileName: `12_Deeni_Kaam_PPT_${new Date().getTime()}.pptx` });
   };
 
@@ -273,18 +207,12 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     const element = document.getElementById("report-card-view");
     if (!element) return;
     try {
-        const canvas = await html2canvas(element, { 
-            scale: 2, 
-            backgroundColor: "#e0f2f1", 
-            useCORS: true,
-            ignoreElements: (node) => node.hasAttribute("data-html2canvas-ignore")
-        });
+        const canvas = await html2canvas(element, { scale: 2, backgroundColor: "#e0f2f1", useCORS: true, ignoreElements: (node) => node.hasAttribute("data-html2canvas-ignore") });
         const link = document.createElement('a');
         link.download = `Deeni_Kaam_Report_Card_${new Date().getTime()}.jpg`;
         link.href = canvas.toDataURL('image/jpeg', 0.9);
         link.click();
     } catch (err) {
-        console.error("Failed to capture image", err);
         alert("Image download failed.");
     }
   };
@@ -297,7 +225,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
 
       <div className="relative z-10">
         <div id="report-card-view" className="bg-[#e0f2f1] pb-6 pt-4">
-            <header className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 relative z-30">
+            <header className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 relative z-35">
               <div className="bg-white border border-slate-200 shadow-sm rounded-2xl px-6 py-5 flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-4 w-full md:w-auto">
                   <button data-html2canvas-ignore="true" onClick={onBack} className="p-3 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-xl shadow-sm transition-colors">
@@ -323,7 +251,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     <ImageIcon className="w-4 h-4" /> <span className="hidden sm:inline">JPEG</span>
                   </button>
                   <button data-html2canvas-ignore="true" onClick={downloadPPT} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-lg border border-teal-600 transition-all active:scale-95">
-                    <Presentation className="w-4 h-4" /> <span className="hidden sm:inline">PPT</span>
+                    <span className="hidden sm:inline">PPT</span>
                   </button>
                   <button data-html2canvas-ignore="true" onClick={downloadExcel} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#198754] hover:bg-green-700 text-white px-4 py-2.5 rounded-lg border border-[#198754] transition-all active:scale-95">
                     <Download className="w-4 h-4" /> <span className="hidden sm:inline">Excel</span>
@@ -335,8 +263,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       <span>Date: {dateStr} &bull; Time: {timeStr}</span>
                     </div>
                     <button data-html2canvas-ignore="true" onClick={onLogout} className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase bg-[#dc3545] hover:bg-red-700 text-white px-4 py-2.5 rounded-lg border border-[#dc3545] transition-all active:scale-95">
-                    <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Logout</span>
-                  </button>
+                      <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Logout</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -349,49 +277,46 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 </div>
               )}
 
-              {/* KPIs (Kept Original 12 Deeni Kaam KPIs) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[
-                  { title: "Total Submitted", val: kpiStats.totalReports, icon: LayoutDashboard },
-                  { title: "Report Quantity", val: kpiStats.totalReportSum, icon: Activity },
-                  { title: "Total Masajid", val: kpiStats.totalMasjid, icon: MapPin },
-                  { title: "Active Muballigh", val: kpiStats.totalMuballigh, icon: User }
-                ].map((kpi, idx) => (
-                  <div key={idx} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
-                    <div className="relative flex justify-between items-center z-10">
-                      <div className="flex items-center gap-4">
-                          <div className={`p-4 rounded-xl ${idx < 2 ? 'bg-amber-50 text-amber-500 border-amber-100' : 'bg-teal-50 text-teal-600 border-teal-100'} border`}>
-                            <kpi.icon className="w-6 h-6" />
-                          </div>
-                          <div>
-                              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{kpi.title}</p>
-                              <h3 className="text-4xl font-black text-teal-800 tracking-tight">{kpi.val.toLocaleString("en-IN")}</h3>
-                          </div>
-                      </div>
-                    </div>
-                  </div>
+              {/* Requirement 3: Top Tabs Selection */}
+              <div className="flex gap-3 border-b border-slate-200 pb-2" data-html2canvas-ignore="true">
+                {["Monthly Report", "Average Report", "Quarterly Report"].map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm ${
+                      activeTab === tab
+                        ? "bg-teal-700 text-white shadow-md"
+                        : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
+                    }`}
+                  >
+                    {tab}
+                  </button>
                 ))}
               </div>
 
-              {/* Filters */}
+              {/* Filters & Requirement 2: Year & Month selection */}
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                 <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-5 border-b border-slate-100 pb-4">
                   <div className="flex items-center gap-3">
                     <Filter className="w-5 h-5 text-teal-700" />
-                    <h2 className="text-sm font-bold text-slate-800 tracking-widest uppercase">Filter & Compare</h2>
+                    <h2 className="text-sm font-bold text-slate-800 tracking-widest uppercase">{activeTab} Filters</h2>
                   </div>
-                  {/* Date Range Selection */}
+                  
+                  {/* Month & Year Selection Inputs */}
                   <div className="flex flex-wrap items-center gap-3" data-html2canvas-ignore="true">
-                     <button onClick={setYTD} className="px-3 py-2 text-[10px] font-bold tracking-widest uppercase bg-teal-50 text-teal-700 rounded-lg border border-teal-200 hover:bg-teal-100 transition-colors">YTD (Year to Date)</button>
                      <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200">
                         <Calendar className="w-4 h-4 text-slate-400 ml-2" />
-                        <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="bg-transparent text-xs font-bold text-slate-700 outline-none" />
+                        <input type="month" value={startMonth} onChange={e => setStartMonth(e.target.value)} className="bg-transparent text-xs font-bold text-slate-700 outline-none" />
                         <span className="text-slate-400 text-xs font-bold">TO</span>
-                        <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="bg-transparent text-xs font-bold text-slate-700 outline-none pr-2" />
+                        <input type="month" value={endMonth} onChange={e => setEndMonth(e.target.value)} className="bg-transparent text-xs font-bold text-slate-700 outline-none pr-2" />
                      </div>
+                     {(startMonth || endMonth) && (
+                       <button onClick={() => { setStartMonth(""); setEndMonth(""); }} className="text-xs text-red-500 font-bold underline px-2">Reset</button>
+                     )}
                   </div>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   <div className="col-span-2 md:col-span-1" data-html2canvas-ignore="true">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Search</label>
                     <div className="relative">
@@ -403,10 +328,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     { label: "Region", val: region, set: handleSetRegion, opts: uniqValues(rawData, "Region") },
                     { label: "State", val: state, set: handleSetState, opts: uniqValues(rawData.filter(x=>!region||sameClient(x["Region"],region)), "State") },
                     { label: "Division", val: division, set: handleSetDivision, opts: uniqValues(rawData.filter(x=>(!region||sameClient(x["Region"],region))&&(!state||sameClient(x["State"],state))), "Division") },
-                    { label: "District", val: district, set: setDistrict, opts: uniqValues(rawData.filter(x=>(!region||sameClient(x["Region"],region))&&(!state||sameClient(x["State"],state))&&(!division||sameClient(x["Division"],division))), "District") },
-                    { label: "Deeni Activities", val: selectedCategory, set: setSelectedCategory, opts: uniqValues(rawData, "Category") }
+                    { label: "District", val: district, set: setDistrict, opts: uniqValues(rawData.filter(x=>(!region||sameClient(x["Region"],region))&&(!state||sameClient(x["State"],state))&&(!division||sameClient(x["Division"],division))), "District") }
                   ].map((f, i) => (
-                    <div key={i} className={`flex flex-col flex-1 ${i===4 ? 'col-span-2 md:col-span-1' : 'min-w-[130px]'}`}>
+                    <div key={i} className="flex flex-col flex-1 min-w-[130px]">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{f.label}</label>
                       <select value={f.val} onChange={(e) => f.set(e.target.value)} disabled={officeUser?.[f.label.toLowerCase()] && officeUser[f.label.toLowerCase()].toLowerCase() !== "all"} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer disabled:bg-slate-50 disabled:text-slate-400">
                         <option value="">{f.val || "All"}</option>
@@ -424,13 +348,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     <div className="flex-1 flex w-full pt-2">
                       {dynamicGraphData.length > 0 ? (
                         <>
-                          {/* Y-Axis Column */}
                           <div className="flex flex-col justify-between items-end pr-3 border-r border-slate-300 pb-8 text-[10px] font-bold text-slate-500 w-12 shrink-0">
                             <span>{maxDynamicCount.toLocaleString("en-IN")}</span>
                             <span>{Math.round(maxDynamicCount / 2).toLocaleString("en-IN")}</span>
                             <span>0</span>
                           </div>
-                          {/* Chart Area */}
                           <div className="flex-1 flex justify-start items-end gap-4 sm:gap-6 pl-4 pb-8 relative border-b border-slate-300 overflow-x-auto custom-scrollbar">
                             {dynamicGraphData.slice(0, 10).map((d, i) => {
                                const h = maxDynamicCount ? (d.count / maxDynamicCount) * 100 : 0;
@@ -455,14 +377,13 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                  </div>
               </div>
             </main>
-        </div> {/* END OF REPORT CARD VIEW */}
+        </div>
 
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pb-8 mt-2">
-          {/* Complex Table Section - Excluded from JPEG */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm mt-6">
             <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 bg-[#e0f2f1] rounded-t-xl">
               <div>
-                <h2 className="text-sm font-bold text-teal-800 uppercase tracking-widest">Detailed Telemetry Output</h2>
+                <h2 className="text-sm font-bold text-teal-800 uppercase tracking-widest">Detailed Telemetry Output ({activeTab})</h2>
                 <p className="text-[10px] text-slate-600 mt-1 uppercase tracking-widest">Source: {rawData.length} &bull; Visible: {filteredData.length}</p>
               </div>
             </div>
@@ -486,6 +407,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-right bg-[#007a7a]">Achievement (%)</th>
                     <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">Month With Year</th>
                     <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">Month With Year</th>
+                    {/* Requirement 4: Comparison Column */}
                     <th className="px-2 py-2 font-bold text-white uppercase tracking-wider text-center bg-[#007a7a]">Comparison (-,+)</th>
                   </tr>
                 </thead>
@@ -499,14 +421,17 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100">{row["Category"] || row["Fields"] || "-"}</td>
                       <td className="px-2 py-2 text-right font-extrabold text-teal-700 text-sm bg-teal-50/40 border-r border-slate-100">{row["Report Value"] || row.report || "0"}</td>
                       
-                      {/* Achievement Data */}
                       <td className="px-2 py-2 text-slate-600 text-center border-r border-slate-100">{row["Month"] || "-"}</td>
                       <td className="px-2 py-2 text-slate-600 text-right border-r border-slate-100">{row["Target"] || "-"}</td>
                       <td className="px-2 py-2 text-blue-600 font-bold text-right border-r border-slate-100">{row["Achievement %"] || row["Achievement"] || "-"}</td>
                       
-                      <td className="px-2 py-2 text-slate-600 text-center border-r border-slate-100">{row["Prev Month"] || "-"}</td>
-                      <td className="px-2 py-2 text-slate-600 text-center border-r border-slate-100">{row["Curr Month"] || "-"}</td>
-                      <td className="px-2 py-2 text-slate-800 font-bold text-center">{row["Comparison"] || "-"}</td>
+                      <td className="px-2 py-2 text-slate-600 text-center border-r border-slate-100">{row["Prev Month"] || startMonth || "-"}</td>
+                      <td className="px-2 py-2 text-slate-600 text-center border-r border-slate-100">{row["Curr Month"] || endMonth || "-"}</td>
+                      
+                      {/* Comparison value display with color coding (+ is green/teal, - is red) */}
+                      <td className={`px-2 py-2 font-bold text-center ${String(row.CalculatedComparison).startsWith("+") ? "text-emerald-600" : "text-red-600"}`}>
+                        {row.CalculatedComparison || "-"}
+                      </td>
                     </tr>
                   )) : (
                     <tr>
