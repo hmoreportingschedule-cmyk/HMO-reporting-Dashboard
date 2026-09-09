@@ -104,7 +104,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState("");
 
-  // Professional View Mode Buttons (Tabs)
+  // 4 Professional View Mode Buttons
   const [activeViewMode, setActiveViewMode] = useState("table"); // 'table' | 'graphs' | 'average' | 'targets'
 
   const [activeTab, setActiveTab] = useState("Monthly Report");
@@ -359,13 +359,13 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 </div>
               )}
 
-              {/* PROFESSIONAL 4-BUTTON VIEW MODE NAVIGATION */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-html2canvas-ignore="true">
+              {/* 4 PROFESSIONAL VIEW MODE BUTTONS (Exact Match to Image) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-html2canvas-ignore="true">
                 {[
-                  { id: "table", label: "Detailed Table Report", icon: LayoutDashboard, desc: "Grid & Month-wise data" },
-                  { id: "graphs", label: "Visual Analytics & Graphs", icon: BarChart3, desc: "District/State charts" },
-                  { id: "average", label: "Average & Comparison", icon: TrendingUp, desc: "Range growth analysis" },
-                  { id: "targets", label: "Targets & Achievement", icon: Target, desc: "Goal performance matrix" }
+                  { id: "table", label: "DETAILED TABLE REPORT", icon: LayoutDashboard, desc: "Grid & Month-wise data" },
+                  { id: "graphs", label: "VISUAL ANALYTICS & GRAPHS", icon: BarChart3, desc: "District/State charts" },
+                  { id: "average", label: "AVERAGE & COMPARISON", icon: TrendingUp, desc: "Range growth analysis" },
+                  { id: "targets", label: "TARGETS & ACHIEVEMENT", icon: Target, desc: "Goal performance matrix" }
                 ].map((btn) => {
                   const IconComp = btn.icon;
                   const isActive = activeViewMode === btn.id;
@@ -373,18 +373,18 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     <button
                       key={btn.id}
                       onClick={() => setActiveViewMode(btn.id)}
-                      className={`p-4 rounded-2xl border text-left transition-all shadow-sm flex items-start gap-3.5 ${
+                      className={`p-5 rounded-2xl border text-left transition-all shadow-sm flex items-start gap-3.5 ${
                         isActive
-                          ? "bg-teal-800 text-white border-teal-900 shadow-md transform -translate-y-0.5"
+                          ? "bg-[#0f4c47] text-white border-[#0f4c47] shadow-md transform -translate-y-0.5"
                           : "bg-white text-slate-700 hover:bg-slate-50 border-slate-200"
                       }`}
                     >
-                      <div className={`p-2.5 rounded-xl ${isActive ? "bg-teal-700 text-white" : "bg-teal-50 text-teal-700"}`}>
+                      <div className={`p-3 rounded-xl ${isActive ? "bg-teal-700 text-white" : "bg-teal-50 text-teal-700"}`}>
                         <IconComp className="w-5 h-5" />
                       </div>
                       <div>
-                        <h3 className="text-xs font-bold uppercase tracking-wider">{btn.label}</h3>
-                        <p className={`text-[10px] mt-0.5 ${isActive ? "text-teal-200" : "text-slate-400"}`}>{btn.desc}</p>
+                        <h3 className="text-xs font-black uppercase tracking-wider">{btn.label}</h3>
+                        <p className={`text-[11px] mt-1 ${isActive ? "text-teal-200" : "text-slate-400 font-medium"}`}>{btn.desc}</p>
                       </div>
                     </button>
                   );
@@ -473,10 +473,37 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 </div>
               </div>
 
-              {/* CONDITIONAL VIEW RENDERING BASED ON BUTTON SELECTED */}
-              
-              {/* VIEW 1 & VIEW 3 & VIEW 4: Tables / Average / Targets */}
-              {(activeViewMode === "table" || activeViewMode === "average" || activeViewMode === "targets") && (
+              {/* CONDITIONAL RENDERING: ONLY SHOW CHARTS IF GRAPHS BUTTON IS SELECTED */}
+              {activeViewMode === "graphs" && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fadeIn">
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 h-[400px] flex flex-col">
+                    <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-4">Visual Distribution Chart ({dynamicGraphTitle})</h3>
+                    <div className="flex-1 flex w-full pt-4">
+                      {dynamicGraphData.length > 0 ? (
+                        <div className="flex-1 flex justify-start items-end gap-4 pl-4 pb-8 relative border-b border-slate-300 overflow-x-auto custom-scrollbar">
+                          {dynamicGraphData.slice(0, 12).map((d, i) => {
+                             const h = maxDynamicCount ? (d.count / maxDynamicCount) * 100 : 0;
+                             return (
+                               <div key={i} className="flex flex-col justify-end items-center relative h-full w-12 shrink-0">
+                                  <span className="text-[10px] font-bold text-slate-700 mb-1">{d.count.toLocaleString("en-IN")}</span>
+                                  <div style={{height: `${Math.max(h, 2)}%`}} className="w-10 bg-teal-700 rounded-t-md transition-all" />
+                                  <span className="absolute -bottom-7 w-24 text-center text-[9px] text-slate-600 truncate">{d.label}</span>
+                               </div>
+                             )
+                          })}
+                        </div>
+                      ) : <div className="mx-auto my-auto text-slate-400 text-xs">No graph data found</div>}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[400px]">
+                    <MiniTable title="STATE WISE METRICS" data={groupCount(processedTableData, "State")} />
+                    <MiniTable title="DISTRICT WISE METRICS" data={groupCount(processedTableData, "District")} />
+                  </div>
+                </div>
+              )}
+
+              {/* SUMMARY CARDS FOR TABLE / AVERAGE / TARGETS MODES */}
+              {activeViewMode !== "graphs" && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 h-[340px] flex flex-col">
                       <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-4">{dynamicGraphTitle}</h3>
@@ -512,127 +539,99 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                    </div>
                 </div>
               )}
-
-              {/* VIEW 2: FULL GRAPHS & ANALYTICS MODE */}
-              {activeViewMode === "graphs" && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 h-[400px] flex flex-col">
-                    <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-4">Primary Distribution Chart ({dynamicGraphTitle})</h3>
-                    <div className="flex-1 flex w-full pt-4">
-                      {dynamicGraphData.length > 0 ? (
-                        <div className="flex-1 flex justify-start items-end gap-4 pl-4 pb-8 relative border-b border-slate-300 overflow-x-auto custom-scrollbar">
-                          {dynamicGraphData.slice(0, 12).map((d, i) => {
-                             const h = maxDynamicCount ? (d.count / maxDynamicCount) * 100 : 0;
-                             return (
-                               <div key={i} className="flex flex-col justify-end items-center relative h-full w-12 shrink-0">
-                                  <span className="text-[10px] font-bold text-slate-700 mb-1">{d.count.toLocaleString("en-IN")}</span>
-                                  <div style={{height: `${Math.max(h, 2)}%`}} className="w-10 bg-teal-700 rounded-t-md transition-all" />
-                                  <span className="absolute -bottom-7 w-24 text-center text-[9px] text-slate-600 truncate">{d.label}</span>
-                               </div>
-                             )
-                          })}
-                        </div>
-                      ) : <div className="mx-auto my-auto text-slate-400 text-xs">No graph data found</div>}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[400px]">
-                    <MiniTable title="STATE WISE METRICS" data={groupCount(processedTableData, "State")} />
-                    <MiniTable title="DISTRICT WISE METRICS" data={groupCount(processedTableData, "District")} />
-                  </div>
-                </div>
-              )}
-
             </main>
         </div>
 
-        {/* MAIN DATA GRID / TABLE SECTION */}
-        <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pb-8 mt-2">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm mt-6">
-            <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 bg-[#e0f2f1] rounded-t-xl">
-              <div>
-                <h2 className="text-sm font-bold text-teal-800 uppercase tracking-widest">
-                  {activeViewMode === "average" ? "Average & Range Comparison Matrix" : activeViewMode === "targets" ? "Targets & Achievement Matrix" : `Detailed Telemetry Output (${activeTab})`}
-                </h2>
-                <p className="text-[10px] text-slate-600 mt-1 uppercase tracking-widest">Source: {rawData.length} &bull; Visible: {processedTableData.length}</p>
+        {/* MAIN DATA GRID / TABLE SECTION (Hidden when Graphs button is active) */}
+        {activeViewMode !== "graphs" && (
+          <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pb-8 mt-2">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm mt-6">
+              <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 bg-[#e0f2f1] rounded-t-xl">
+                <div>
+                  <h2 className="text-sm font-bold text-teal-800 uppercase tracking-widest">
+                    {activeViewMode === "average" ? "Average & Range Comparison Matrix" : activeViewMode === "targets" ? "Targets & Achievement Matrix" : `Detailed Telemetry Output (${activeTab})`}
+                  </h2>
+                  <p className="text-[10px] text-slate-600 mt-1 uppercase tracking-widest">Source: {rawData.length} &bull; Visible: {processedTableData.length}</p>
+                </div>
               </div>
-            </div>
 
-            <div className="overflow-x-auto w-full custom-scrollbar">
-              <table className="min-w-full text-left text-[11px] lg:text-xs">
-                <thead className="bg-[#008b8b]">
-                  <tr>
-                    <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">Region</th>
-                    <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">State</th>
-                    <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">Division</th>
-                    <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">District</th>
-                    <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">Deeni Activities</th>
-                    <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle text-right">Report</th>
-                    <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-r border-white/20 text-center">Achievement</th>
-                    <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-white/20 text-center">
-                      {activeViewMode === "average" ? "Average Range Analysis" : "Comparison Report"}
-                    </th>
-                  </tr>
-                  <tr>
-                    <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">Month</th>
-                    <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-right bg-[#007a7a]">Targets</th>
-                    <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-right bg-[#007a7a]">Achievement (%)</th>
-                    
-                    <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">
-                      {formatMonthYearLabel(startMonth)}
-                    </th>
-                    <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">
-                      {formatMonthYearLabel(endMonth)}
-                    </th>
-                    
-                    <th className="px-2 py-2 font-bold text-white uppercase tracking-wider text-center bg-[#007a7a]">Comparison (%)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {pagedRows.length > 0 ? pagedRows.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["Region"] || "-"}</td>
-                      <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["State"] || "-"}</td>
-                      <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["Division"] || "-"}</td>
-                      <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["District"] || "-"}</td>
-                      
-                      <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100">{row["Fileds"] || row["Fields"] || row["Deeni Activities"] || "-"}</td>
-                      
-                      <td className="px-2 py-2 text-right font-extrabold text-teal-700 text-sm bg-teal-50/40 border-r border-slate-100">{row["Report Value"] || row.report || "0"}</td>
-                      
-                      <td className="px-2 py-2 text-slate-600 text-center border-r border-slate-100">{row["Month"] || "-"}</td>
-                      
-                      <td className="px-2 py-2 text-slate-600 text-right border-r border-slate-100">{row["Target"] || "-"}</td>
-                      <td className="px-2 py-2 text-blue-600 font-bold text-right border-r border-slate-100">{row["Achievement %"] || row["Achievement"] || "-"}</td>
-                      
-                      <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row.Val1}</td>
-                      <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row.Val2}</td>
-                      
-                      <td className={`px-2 py-2 font-bold text-center ${String(row.CalculatedComparison).startsWith("+") ? "text-emerald-600" : "text-red-600"}`}>
-                        {row.CalculatedComparison}
-                      </td>
-                    </tr>
-                  )) : (
+              <div className="overflow-x-auto w-full custom-scrollbar">
+                <table className="min-w-full text-left text-[11px] lg:text-xs">
+                  <thead className="bg-[#008b8b]">
                     <tr>
-                      <td colSpan="12" className="px-6 py-12 text-center text-slate-500 text-xs uppercase tracking-widest">
-                        <div className="flex flex-col items-center justify-center gap-3">
-                          <Activity className="w-6 h-6 opacity-40 text-teal-600" />
-                          <span>{loading ? "Establishing connection..." : "No matching telemetry found"}</span>
-                        </div>
-                      </td>
+                      <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">Region</th>
+                      <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">State</th>
+                      <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">Division</th>
+                      <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">District</th>
+                      <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">Deeni Activities</th>
+                      <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle text-right">Report</th>
+                      <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-r border-white/20 text-center">Achievement</th>
+                      <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-white/20 text-center">
+                        {activeViewMode === "average" ? "Average Range Analysis" : "Comparison Report"}
+                      </th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            {processedTableData.length > rowsPerPage && (
-              <div className="p-4 border-t border-slate-200 bg-[#f8fafc] rounded-b-xl flex justify-center items-center gap-2">
-                <button disabled={currentPage===1} onClick={()=>setCurrentPage(p=>p-1)} className="px-3 py-1.5 rounded-lg border border-teal-600 bg-white text-xs font-bold text-teal-700 disabled:opacity-30 shadow-sm transition-all hover:bg-teal-50">PREV</button>
-                <span className="text-xs font-bold text-teal-700 px-4">PAGE {currentPage} OF {Math.ceil(processedTableData.length / rowsPerPage)}</span>
-                <button disabled={currentPage===Math.ceil(processedTableData.length / rowsPerPage)} onClick={()=>setCurrentPage(p=>p+1)} className="px-3 py-1.5 rounded-lg border border-teal-600 bg-white text-xs font-bold text-teal-700 disabled:opacity-30 shadow-sm transition-all hover:bg-teal-50">NEXT</button>
+                    <tr>
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">Month</th>
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-right bg-[#007a7a]">Targets</th>
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-right bg-[#007a7a]">Achievement (%)</th>
+                      
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">
+                        {formatMonthYearLabel(startMonth)}
+                      </th>
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">
+                        {formatMonthYearLabel(endMonth)}
+                      </th>
+                      
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider text-center bg-[#007a7a]">Comparison (%)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {pagedRows.length > 0 ? pagedRows.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["Region"] || "-"}</td>
+                        <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["State"] || "-"}</td>
+                        <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["Division"] || "-"}</td>
+                        <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["District"] || "-"}</td>
+                        
+                        <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100">{row["Fileds"] || row["Fields"] || row["Deeni Activities"] || "-"}</td>
+                        
+                        <td className="px-2 py-2 text-right font-extrabold text-teal-700 text-sm bg-teal-50/40 border-r border-slate-100">{row["Report Value"] || row.report || "0"}</td>
+                        
+                        <td className="px-2 py-2 text-slate-600 text-center border-r border-slate-100">{row["Month"] || "-"}</td>
+                        
+                        <td className="px-2 py-2 text-slate-600 text-right border-r border-slate-100">{row["Target"] || "-"}</td>
+                        <td className="px-2 py-2 text-blue-600 font-bold text-right border-r border-slate-100">{row["Achievement %"] || row["Achievement"] || "-"}</td>
+                        
+                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row.Val1}</td>
+                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row.Val2}</td>
+                        
+                        <td className={`px-2 py-2 font-bold text-center ${String(row.CalculatedComparison).startsWith("+") ? "text-emerald-600" : "text-red-600"}`}>
+                          {row.CalculatedComparison}
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan="12" className="px-6 py-12 text-center text-slate-500 text-xs uppercase tracking-widest">
+                          <div className="flex flex-col items-center justify-center gap-3">
+                            <Activity className="w-6 h-6 opacity-40 text-teal-600" />
+                            <span>{loading ? "Establishing connection..." : "No matching telemetry found"}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </div>
-        </main>
+              {processedTableData.length > rowsPerPage && (
+                <div className="p-4 border-t border-slate-200 bg-[#f8fafc] rounded-b-xl flex justify-center items-center gap-2">
+                  <button disabled={currentPage===1} onClick={()=>setCurrentPage(p=>p-1)} className="px-3 py-1.5 rounded-lg border border-teal-600 bg-white text-xs font-bold text-teal-700 disabled:opacity-30 shadow-sm transition-all hover:bg-teal-50">PREV</button>
+                  <span className="text-xs font-bold text-teal-700 px-4">PAGE {currentPage} OF {Math.ceil(processedTableData.length / rowsPerPage)}</span>
+                  <button disabled={currentPage===Math.ceil(processedTableData.length / rowsPerPage)} onClick={()=>setCurrentPage(p=>p+1)} className="px-3 py-1.5 rounded-lg border border-teal-600 bg-white text-xs font-bold text-teal-700 disabled:opacity-30 shadow-sm transition-all hover:bg-teal-50">NEXT</button>
+                </div>
+              )}
+            </div>
+          </main>
+        )}
       </div>
     </div>
   );
