@@ -93,42 +93,48 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     setFetchError("");
 
     try {
-      // Google Drive File ID URL se automatically extract hoga
       const fileIdMatch = DEFAULT_SHEET_URL.match(/\/d\/([a-zA-Z0-9_-]+)/);
       const fileId = fileIdMatch ? fileIdMatch[1] : "";
       if (!fileId) {
-        throw new Error("Invalid Google Drive file URL. Please paste a valid Drive file URL in DEFAULT_SHEET_URL.");
+        throw new Error("Invalid Google Drive file URL. Please paste a valid link.");
       }
-      const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-      
-      // Use AllOrigins Proxy to bypass Google Drive CORS blocking
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(driveUrl)}`;
 
-      Papa.parse(proxyUrl, {
-        download: true,
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          if (results.data && results.data.length > 0) {
-            const processed = results.data.map(row => ({
-              ...row,
-              Target: Number(String(row["Target"] || "0").replace(/,/g, "")),
-              Achievement: Number(String(row["Achievement"] || row["Achivement"] || "0").replace(/,/g, "")),
-              ParsedDate: new Date(row["Date"] || row["Date/Time"]) 
-            }));
-            setRawData(processed);
-          } else {
-            setFetchError("Data stream empty. CSV file format issue or empty file.");
-          }
-          setLoading(false);
-        },
-        error: (err) => {
-          setFetchError("Connection Error: Failed to fetch from Google Drive. Ensure file is Public.");
-          setLoading(false);
-        },
-      });
+      // Convert GDrive link to direct download link with confirm=t for large files
+      const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`;
+      
+      // Use corsproxy to safely fetch binary Excel data
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(driveUrl)}`;
+
+      const response = await fetch(proxyUrl);
+      if (!response.ok) {
+        throw new Error("Google Drive connection blocked. Ensure file is Public.");
+      }
+
+      // Read as ArrayBuffer for XLSX parsing
+      const arrayBuffer = await response.arrayBuffer();
+      
+      // Parse with XLSX (SheetJS)
+      const workbook = XLSX.read(arrayBuffer, { type: "array" });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      
+      // Convert to JSON
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+      if (jsonData && jsonData.length > 0) {
+        const processed = jsonData.map(row => ({
+          ...row,
+          Target: Number(String(row["Target"] || "0").replace(/,/g, "")),
+          Achievement: Number(String(row["Achievement"] || row["Achivement"] || "0").replace(/,/g, "")),
+          ParsedDate: new Date(row["Date"] || row["Date/Time"]) 
+        }));
+        setRawData(processed);
+      } else {
+        setFetchError("Data stream empty. File format issue or empty file.");
+      }
+      setLoading(false);
     } catch (err) {
-      setFetchError("Error: " + err.message);
+      setFetchError("Connection Error: " + err.message);
       setLoading(false);
     }
   };
