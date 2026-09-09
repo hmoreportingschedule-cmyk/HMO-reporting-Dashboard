@@ -10,14 +10,20 @@ export default function Dashboard() {
     async function fetchData() {
       try {
         const res = await fetch('/api/deeni-data');
-        const json = await res.json();
+        const text = await res.text();
+        
+        if (!text) {
+          throw new Error('API returned an empty response.');
+        }
+
+        const json = JSON.parse(text);
         if (json.success) {
           setData(json.data);
         } else {
-          setError(json.error);
+          setError(json.error || 'Unknown error from server');
         }
       } catch (err) {
-        setError('Failed to fetch data');
+        setError(err.message);
       } finally {
         setLoading(false);
       }
@@ -35,8 +41,8 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-950 text-red-500">
-        <p>Error: {error}</p>
+      <div className="flex items-center justify-center min-h-screen bg-gray-950 text-red-500 p-4">
+        <p>Error loading data: {error}</p>
       </div>
     );
   }
