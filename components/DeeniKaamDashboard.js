@@ -7,7 +7,7 @@ import pptxgen from "pptxgenjs";
 import html2canvas from "html2canvas";
 
 // ⚠️ YAHAN DEENI KAAM KI GOOGLE SHEET KA CSV LINK PASTE KAREIN
-const DEFAULT_SHEET_URL = "https://drive.google.com/uc?export=download&id=1xRe-BTJzHWq4IDw8x3YEfVrXsk_89rhU";
+const DEFAULT_SHEET_URL = "https://drive.google.com/uc?export=download&id=1xRe-BTJzHWq4IDw8x3YEfVrXsk_89rhU&confirm=t";
 
 const sameClient = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
@@ -94,12 +94,12 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     setFetchError("");
 
     try {
-      // Google Drive CSVs need a CORS proxy to be read directly in the browser
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(sheetUrl)}`;
+      // Using allorigins to bypass CORS and confirm=t to bypass Google Drive virus scan for large files
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(sheetUrl)}`;
       const response = await fetch(proxyUrl);
       
       if (!response.ok) {
-        throw new Error("Google Drive connection blocked or file is not public.");
+        throw new Error("File is too large, proxy failed, or file is not public.");
       }
       
       const csvText = await response.text();
@@ -117,7 +117,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
             }));
             setRawData(processed);
           } else {
-            setFetchError("Data stream empty. CSV file might be empty.");
+            setFetchError("Data stream empty. CSV format issue.");
           }
           setLoading(false);
         },
@@ -127,7 +127,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         },
       });
     } catch (err) {
-      setFetchError("Connection Failed: " + err.message);
+      setFetchError("Connection Error: " + err.message);
       setLoading(false);
     }
   };
