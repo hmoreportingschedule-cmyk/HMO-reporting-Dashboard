@@ -7,7 +7,7 @@ import pptxgen from "pptxgenjs";
 import html2canvas from "html2canvas";
 
 // ⚠️ YAHAN DEENI KAAM KI GOOGLE SHEET KA CSV LINK PASTE KAREIN
-const DEFAULT_SHEET_URL = "/deeni_data.csv";
+const DEFAULT_SHEET_URL = "https://drive.google.com/file/d/1xRe-BTJzHWq4IDw8x3YEfVrXsk_89rhU/view";
 
 const sameClient = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
@@ -92,29 +92,41 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     setLoading(true);
     setFetchError("");
 
-    Papa.parse(sheetUrl, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        if (results.data && results.data.length > 0) {
-          const processed = results.data.map(row => ({
-            ...row,
-            Target: Number(String(row["Target"] || "0").replace(/,/g, "")),
-            Achievement: Number(String(row["Achievement"] || row["Achivement"] || "0").replace(/,/g, "")),
-            ParsedDate: new Date(row["Date"] || row["Date/Time"]) 
-          }));
-          setRawData(processed);
-        } else {
-          setFetchError("Data stream empty. File might be empty.");
-        }
-        setLoading(false);
-      },
-      error: () => {
-        setFetchError("File not found! Kripya apni CSV file ko GitHub ke 'public' folder mein 'deeni_data.csv' ke naam se upload karein.");
-        setLoading(false);
-      },
-    });
+    try {
+      // User's Google Drive File ID
+      const fileId = "1xRe-BTJzHWq4IDw8x3YEfVrXsk_89rhU";
+      const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+      
+      // Use AllOrigins Proxy to bypass Google Drive CORS blocking
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(driveUrl)}`;
+
+      Papa.parse(proxyUrl, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          if (results.data && results.data.length > 0) {
+            const processed = results.data.map(row => ({
+              ...row,
+              Target: Number(String(row["Target"] || "0").replace(/,/g, "")),
+              Achievement: Number(String(row["Achievement"] || row["Achivement"] || "0").replace(/,/g, "")),
+              ParsedDate: new Date(row["Date"] || row["Date/Time"]) 
+            }));
+            setRawData(processed);
+          } else {
+            setFetchError("Data stream empty. CSV file format issue or empty file.");
+          }
+          setLoading(false);
+        },
+        error: (err) => {
+          setFetchError("Connection Error: Failed to fetch from Google Drive. Ensure file is Public.");
+          setLoading(false);
+        },
+      });
+    } catch (err) {
+      setFetchError("Error: " + err.message);
+      setLoading(false);
+    }
   };
 
   const setYTD = () => {
