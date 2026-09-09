@@ -1,75 +1,51 @@
-'use client';
-import { useState, useEffect } from 'react';
+import { NextResponse } from 'next/server';
 
-export default function Dashboard() {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+export const dynamic = 'force-dynamic';
 
-  useEffect(() => {
-    async function fetchData() {
+const sheetUrls = [
+  'https://docs.google.com/spreadsheets/d/1P1Ul-jXOfFfhuQLTKeQ-zOynKnCmywH-_gjZ9nJ8tO0/export?format=csv',
+  'https://docs.google.com/spreadsheets/d/1S2tEIyaN8p-yu4Vd_GVumqBqwzgTzM3zlms4DwCJr00/export?format=csv',
+  'https://docs.google.com/spreadsheets/d/1yWVgL9IVGrQFElLNeO8X_UGAIDSAGF7P8M31gGtoki8/export?format=csv'
+];
+
+export async function GET() {
+  try {
+    let allRows = [];
+
+    for (const url of sheetUrls) {
       try {
-        const res = await fetch('/api/deeni-data');
-        const text = await res.text();
+        const response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) continue;
         
-        if (!text) {
-          throw new Error('API returned an empty response.');
+        const csvText = await response.text();
+        
+        // Agar Google ka login page ya error HTML aa jaye toh skip kar dein
+        if (csvText.includes('<!DOCTYPE html>') || csvText.includes('Google Accounts')) {
+          console.error('Sheet is private or requires authentication:', url);
+          continue;
         }
 
-        const json = JSON.parse(text);
-        if (json.success) {
-          setData(json.data);
-        } else {
-          setError(json.error || 'Unknown error from server');
+        const lines = csvText.split('\n').filter(line => line.trim() !== '');
+        if (lines.length === 0) continue;
+        
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+        
+        for (let i = 1; i < lines.length; i++) {
+          const currentLine = lines[i].split(',');
+          let rowObj = {};
+          for (let j = 0; j < headers.length; j++) {
+            rowObj[headers[j]] = currentLine[j] ? currentLine[j].trim().replace(/^"|"$/g, '') : '';
+          }
+          allRows.push(rowObj);
         }
       } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
+        console.error('Error parsing sheet:', err);
       }
     }
-    fetchData();
-  }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-950 text-white">
-        <p className="text-lg">Loading Deeni Kaam data from Google Sheets...</p>
-      </div>
-    );
+    return NextResponse.json({ success: true, data: allRows });
+  } catch (error) {
+    console.error('API Crash Error:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-950 text-red-500 p-4">
-        <p>Error loading data: {error}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-8 bg-gray-950 min-h-screen text-white">
-      <h1 className="text-2xl font-bold mb-6">Deeni Kaam Dashboard</h1>
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse border border-gray-800">
-          <thead>
-            <tr className="bg-gray-900">
-              {data.length > 0 && Object.keys(data[0]).map((key) => (
-                <th key={key} className="border border-gray-800 p-2 text-left">{key}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((row, index) => (
-              <tr key={index} className="hover:bg-gray-900">
-                {Object.values(row).map((val, idx) => (
-                  <td key={idx} className="border border-gray-800 p-2">{val}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
 }
