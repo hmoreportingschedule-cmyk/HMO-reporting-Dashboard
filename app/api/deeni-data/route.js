@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-export const dynamic = 'force-dynamic'; // Yeh line Next.js ko static prerender karne se rokti hai
+export const dynamic = 'force-dynamic';
 
 const sheetUrls = [
   'https://docs.google.com/spreadsheets/d/1P1Ul-jXOfFfhuQLTKeQ-zOynKnCmywH-_gjZ9nJ8tO0/export?format=csv',
@@ -14,7 +14,7 @@ export async function GET() {
 
     for (const url of sheetUrls) {
       try {
-        const response = await fetch(url, { cache: 'no-store' });
+        const response = await fetch(url, { next: { revalidate: 60 } }); // 60 seconds caching for lightning speed
         if (!response.ok) continue;
         
         const csvText = await response.text();
