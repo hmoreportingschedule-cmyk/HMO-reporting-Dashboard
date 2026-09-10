@@ -87,14 +87,14 @@ const MiniTable = ({ title, data = [] }) => (
       <table className="w-full text-left text-xs">
         <thead className="bg-teal-700 text-white sticky top-0 z-10">
           <tr>
-            <th className="py-2.5 px-4 font-bold uppercase tracking-wider">Name</th>
+            <th className="py-2.5 px-4 font-bold uppercase tracking-wider text-center">Name</th>
             <th className="py-2.5 px-4 font-bold uppercase tracking-wider text-right">Qty</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {Array.isArray(data) && data.length > 0 ? data.slice(0, 15).map((d, i) => (
             <tr key={i} className="hover:bg-slate-50 transition-colors">
-              <td className="py-2.5 px-4 text-slate-700">{d?.label || "-"}</td>
+              <td className="py-2.5 px-4 text-slate-700 text-center">{d?.label || "-"}</td>
               <td className="py-2.5 px-4 text-teal-700 font-bold text-right">{(d?.count || 0).toLocaleString("en-IN")}</td>
             </tr>
           )) : <tr><td colSpan="2" className="text-center py-4 text-slate-500">No data available</td></tr>}
@@ -193,30 +193,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return uniqValues(subset, "Fileds");
   }, [rawData, selectedCategory]);
 
-  const lookupMap = useMemo(() => {
-    const map = {};
-    if (Array.isArray(rawData)) {
-      rawData.forEach(r => {
-        if (!r) return;
-        const reg = String(r["Region"] || "").trim().toLowerCase();
-        const st = String(r["State"] || "").trim().toLowerCase();
-        const div = String(r["Division"] || "").trim().toLowerCase();
-        const dist = String(r["District"] || "").trim().toLowerCase();
-        const fld = String(r["Fileds"] || r["Fields"] || r["Deeni Activities"] || "").trim().toLowerCase();
-        const mo = String(r.NormalizedMonth || "").trim();
-        const key = `${reg}|${st}|${div}|${dist}|${fld}|${mo}`;
-        map[key] = {
-          report: r.NumericReport || 0,
-          target: r.Target || 0,
-          achievement: r.Achievement || 0
-        };
-      });
-    }
-    return map;
-  }, [rawData]);
-
+  // Aggregation Engine for India / Region / State / Division / District Totals
   const processedTableData = useMemo(() => {
     if (!Array.isArray(rawData)) return [];
+    
+    // 1. Filter rawData based on UI filters
     const baseFiltered = rawData.filter((row) => {
       if (!row) return false;
       const matchRegion = !region || sameClient(row["Region"], region);
@@ -230,97 +211,115 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       return matchRegion && matchState && matchDivision && matchDistrict && matchCat && matchField && matchSearch;
     });
 
-    const uniqueMap = {};
+    // 2. Determine aggregation grouping key based on selected filters
+    // If no filter -> group by Field (India level total)
+    // If Region selected -> group by State + Field
+    // If State selected -> group by Division + Field
+    // If Division selected -> group by District + Field
+    // If District selected -> group by District + Field
+    const getGroupKey = (r) => {
+      const fld = String(r["Fileds"] || r["Fields"] || r["Deeni Activities"] || "").trim();
+      if (district) return `${String(r["District"] || "").trim()}|${fld}`;
+      if (division) return `${String(r["District"] || "").trim()}|${fld}`;
+      if (state) return `${String(r["Division"] || "").trim()}|${fld}`;
+      if (region) return `${String(r["State"] || "").trim()}|${fld}`;
+      return fld; // India Level Total
+    };
+
+    const getLeftColName = (r) => {
+      if (district) return r["District"] || "-";
+      if (division) return r["District"] || "-";
+      if (state) return r["Division"] || "-";
+      if (region) return r["State"] || "-";
+      return "India";
+    };
+
+    // Helper to get aggregated report value for a specific month & group key
+    const getAggregatedValForMonth = (targetMo, groupKeyFilter, isTargetOrAch = false) => {
+      let totalRep = 0;
+      let totalTarget = 0;
+      let count = 0;
+
+      baseFiltered.forEach(r => {
+        if (!r) return;
+        const mo = r.NormalizedMonth || "";
+        if (targetMo && mo !== targetMo) return;
+        
+        const fld = String(r["Fileds"] || r["Fields"] || r["Deeni Activities"] || "").trim();
+        let matchesGroup = false;
+        if (district) matchesGroup = String(r["District"] || "").trim() === groupKeyFilter.split("|")[0];
+        else if (division) matchesGroup = String(r["District"] || "").trim() === groupKeyFilter.split("|")[0];
+        else if (state) matchesGroup = String(r["Division"] || "").trim() === groupKeyFilter.split("|")[0];
+        else if (region) matchesGroup = String(r["State"] || "").trim() === groupKeyFilter.split("|")[0];
+        else matchesGroup = fld === groupKeyFilter;
+
+        if (matchesGroup) {
+          totalRep += r.NumericReport || 0;
+          totalTarget += r.Target || 0;
+          count++;
+        }
+      });
+
+      if (isTargetOrAch) {
+        return { target: totalTarget, report: totalRep };
+      }
+      return totalRep;
+    };
+
+    // Group and aggregate data
+    const aggregatedMap = {};
     baseFiltered.forEach(row => {
       if (!row) return;
-      const reg = String(row["Region"] || "").trim();
-      const st = String(row["State"] || "").trim();
-      const div = String(row["Division"] || "").trim();
-      const dist = String(row["District"] || "").trim();
-      const fld = String(row["Fileds"] || row["Fields"] || row["Deeni Activities"] || "").trim();
-      const key = `${reg}|${st}|${div}|${dist}|${fld}`;
+      const gKey = getGroupKey(row);
+      const leftVal = getLeftColName(row);
+      const fld = row["Fileds"] || row["Fields"] || row["Deeni Activities"] || "-";
 
-      if (!uniqueMap[key]) {
-        uniqueMap[key] = {
-          ...row,
-          Region: reg,
-          State: st,
-          Division: div,
-          District: dist,
-          Fileds: fld
+      if (!aggregatedMap[gKey]) {
+        const targetMo = endMonth || startMonth || row.NormalizedMonth || "";
+        
+        // Current report value (for selected month or total)
+        const curRep = getAggregatedValForMonth(targetMo, gKey);
+        const targetAchObj = getAggregatedValForMonth(targetMo, gKey, true);
+
+        // Val1 (Start Month) & Val2 (End Month) for comparison
+        let v1 = startMonth ? getAggregatedValForMonth(startMonth, gKey) : curRep;
+        let v2 = endMonth ? getAggregatedValForMonth(endMonth, gKey) : curRep;
+
+        if (activeTab === "Average Report" || activeViewMode === "average") {
+          v1 = Math.round(v1 / 2);
+          v2 = Math.round(v2 / 2);
+        } else if (activeTab === "Quarterly Report") {
+          v1 = v1 * 3;
+          v2 = v2 * 3;
+        }
+
+        let diffPercent = 0;
+        if (v1 > 0) {
+          diffPercent = ((v2 - v1) / v1) * 100;
+        } else if (v1 === 0 && v2 > 0) {
+          diffPercent = 100;
+        } else if (v1 > 0 && v2 === 0) {
+          diffPercent = -100;
+        }
+
+        let compStr = `${diffPercent >= 0 ? "+" : ""}${diffPercent.toFixed(1)}%`;
+
+        aggregatedMap[gKey] = {
+          LeftColValue: leftVal,
+          DeeniActivity: fld,
+          DynamicMonthDisplay: formatMonthYearLabel(targetMo),
+          DynamicReportValue: curRep,
+          DynamicTarget: targetAchObj.target,
+          DynamicAchievement: targetAchObj.target > 0 ? ((curRep / targetAchObj.target) * 100).toFixed(1) + "%" : "-",
+          Val1: v1,
+          Val2: v2,
+          CalculatedComparison: compStr
         };
       }
     });
 
-    return Object.values(uniqueMap).map(row => {
-      const regKey = row.Region.toLowerCase();
-      const stKey = row.State.toLowerCase();
-      const divKey = row.Division.toLowerCase();
-      const distKey = row.District.toLowerCase();
-      const fldKey = row.Fileds.toLowerCase();
-
-      const targetMonth = endMonth || startMonth || row.NormalizedMonth || "";
-
-      let currentReportVal = row.NumericReport || 0;
-      let currentTargetVal = row.Target || 0;
-      let currentAch = row.Achievement || 0;
-
-      if (targetMonth) {
-        const kTarget = `${regKey}|${stKey}|${divKey}|${distKey}|${fldKey}|${targetMonth}`;
-        if (lookupMap[kTarget]) {
-          currentReportVal = lookupMap[kTarget].report;
-          currentTargetVal = lookupMap[kTarget].target;
-          currentAch = lookupMap[kTarget].achievement;
-        }
-      }
-
-      let v1 = 0;
-      if (startMonth) {
-        const k1 = `${regKey}|${stKey}|${divKey}|${distKey}|${fldKey}|${startMonth}`;
-        v1 = lookupMap[k1]?.report || 0;
-      } else {
-        v1 = row.NumericReport || 0;
-      }
-
-      let v2 = 0;
-      if (endMonth) {
-        const k2 = `${regKey}|${stKey}|${divKey}|${distKey}|${fldKey}|${endMonth}`;
-        v2 = lookupMap[k2]?.report || 0;
-      } else {
-        v2 = row.NumericReport || 0;
-      }
-
-      if (activeTab === "Average Report" || activeViewMode === "average") {
-        v1 = Math.round(v1 / 2);
-        v2 = Math.round(v2 / 2);
-      } else if (activeTab === "Quarterly Report") {
-        v1 = v1 * 3;
-        v2 = v2 * 3;
-      }
-
-      let diffPercent = 0;
-      if (v1 > 0) {
-        diffPercent = ((v2 - v1) / v1) * 100;
-      } else if (v1 === 0 && v2 > 0) {
-        diffPercent = 100;
-      } else if (v1 > 0 && v2 === 0) {
-        diffPercent = -100;
-      }
-
-      let compStr = `${diffPercent >= 0 ? "+" : ""}${diffPercent.toFixed(1)}%`;
-
-      return {
-        ...row,
-        DynamicMonthDisplay: formatMonthYearLabel(targetMonth),
-        DynamicReportValue: currentReportVal,
-        DynamicTarget: currentTargetVal,
-        DynamicAchievement: currentAch || (currentTargetVal > 0 ? ((currentReportVal / currentTargetVal) * 100).toFixed(1) + "%" : "-"),
-        Val1: v1,
-        Val2: v2,
-        CalculatedComparison: compStr
-      };
-    });
-  }, [rawData, region, state, division, district, selectedCategory, selectedField, searchTerm, startMonth, endMonth, activeTab, activeViewMode, lookupMap]);
+    return Object.values(aggregatedMap);
+  }, [rawData, region, state, division, district, selectedCategory, selectedField, searchTerm, startMonth, endMonth, activeTab, activeViewMode]);
 
   const pagedRows = useMemo(() => {
     if (!Array.isArray(processedTableData)) return [];
@@ -334,8 +333,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     if (Array.isArray(processedTableData)) {
       processedTableData.forEach(x => {
         if (!x) return;
-        const k = String(x[key] || "Unknown").trim();
-        const n = Number(x["Report Value"] || x.NumericReport || 0);
+        const k = String(x.LeftColValue || "Unknown").trim();
+        const n = Number(x.DynamicReportValue || 0);
         map[k] = (map[k] || 0) + (isNaN(n) ? 0 : n);
       });
     }
@@ -347,8 +346,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
 
   const downloadExcel = () => {
     if (!processedTableData.length) return alert("No data to export");
-    const exportData = processedTableData.map(x => { let r = { ...x }; delete r.NormalizedMonth; return r; });
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const worksheet = XLSX.utils.json_to_sheet(processedTableData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Deeni Kaam Data");
     XLSX.writeFile(workbook, `12_Deeni_Kaam_RawData_${new Date().getTime()}.xlsx`);
@@ -632,19 +630,19 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 <table className="min-w-full text-left text-[11px] lg:text-xs">
                   <thead className="bg-[#008b8b]">
                     <tr>
-                      <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">
+                      <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">
                         {!region && !state && !division && !district && "COUNTRY"}
                         {region && !state && !division && !district && "REGION"}
                         {state && !division && !district && "STATE"}
                         {division && !district && "DIVISION"}
                         {district && "DISTRICT"}
                       </th>
-                      <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">DEENI ACTIVITIES</th>
-                      <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-r border-white/20 text-center">ACHIEVEMENT</th>
-                      <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-white/20 text-center">COMPARISON REPORT</th>
+                      <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">DEENI ACTIVITIES</th>
+                      <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-r border-white/25 text-center">ACHIEVEMENT</th>
+                      <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-white/25 text-center">COMPARISON REPORT</th>
                     </tr>
                     <tr>
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
                         {!region && !state && !division && !district && "INDIA"}
                         {region && !state && !division && !district && region}
                         {state && !division && !district && state}
@@ -652,50 +650,42 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                         {district && district}
                       </th>
                       
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">DEENI ACTIVITIES</th>
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">DEENI ACTIVITIES</th>
                       
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
                         {formatMonthYearLabel(endMonth || startMonth || "Month")}
                       </th>
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-right bg-[#007a7a]">TARGETS</th>
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-right bg-[#007a7a]">ACHIEVEMENT (%)</th>
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/25 text-right bg-[#007a7a]">TARGETS</th>
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/25 text-right bg-[#007a7a]">ACHIEVEMENT (%)</th>
                       
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
                         {formatMonthYearLabel(startMonth)}
                       </th>
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
                         {formatMonthYearLabel(endMonth)}
                       </th>
                       <th className="px-2 py-2 font-bold text-white uppercase tracking-wider text-center bg-[#007a7a]">COMPARISON (%)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {pagedRows.length > 0 ? pagedRows.map((row, idx) => {
-                      let leftColVal = "India";
-                      if (district) leftColVal = row?.["District"] || "-";
-                      else if (division) leftColVal = row?.["District"] || "-";
-                      else if (state) leftColVal = row?.["Division"] || "-";
-                      else if (region) leftColVal = row?.["State"] || "-";
-
-                      return (
-                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-2 py-2 font-bold text-teal-800 leading-tight border-r border-slate-100">{leftColVal}</td>
-                          
-                          <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100">{row?.["Fileds"] || row?.["Fields"] || row?.["Deeni Activities"] || "-"}</td>
-                          
-                          <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row?.DynamicReportValue ?? 0}</td>
-                          <td className="px-2 py-2 text-slate-600 text-right border-r border-slate-100">{row?.DynamicTarget ?? "-"}</td>
-                          <td className="px-2 py-2 text-blue-600 font-bold text-right border-r border-slate-100">{row?.DynamicAchievement ?? "-"}</td>
-                          
-                          <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row?.Val1 ?? 0}</td>
-                          <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row?.Val2 ?? 0}</td>
-                          
-                          <td className={`px-2 py-2 font-bold text-center ${String(row?.CalculatedComparison || "").startsWith("+") ? "text-emerald-600" : "text-red-600"}`}>
-                            {row?.CalculatedComparison || "0.0%"}
-                          </td>
-                        </tr>
-                      );
-                    }) : (
+                    {pagedRows.length > 0 ? pagedRows.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-2 py-2 font-bold text-teal-800 leading-tight border-r border-slate-100 text-center">{row?.LeftColValue || "-"}</td>
+                        
+                        <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100 text-center">{row?.DeeniActivity || "-"}</td>
+                        
+                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row?.DynamicReportValue ?? 0}</td>
+                        <td className="px-2 py-2 text-slate-600 text-right border-r border-slate-100">{row?.DynamicTarget ?? "-"}</td>
+                        <td className="px-2 py-2 text-blue-600 font-bold text-right border-r border-slate-100">{row?.DynamicAchievement ?? "-"}</td>
+                        
+                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row?.Val1 ?? 0}</td>
+                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row?.Val2 ?? 0}</td>
+                        
+                        <td className={`px-2 py-2 font-bold text-center ${String(row?.CalculatedComparison || "").startsWith("+") ? "text-emerald-600" : "text-red-600"}`}>
+                          {row?.CalculatedComparison || "0.0%"}
+                        </td>
+                      </tr>
+                    )) : (
                       <tr>
                         <td colSpan="8" className="px-6 py-12 text-center text-slate-500 text-xs uppercase tracking-widest">
                           <div className="flex flex-col items-center justify-center gap-3">
