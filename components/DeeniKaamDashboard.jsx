@@ -675,9 +675,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">DEENI KAAM</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">FIELDS</th>
                     
-                    {/* Main Report Column with Transparent Border Pill Selector */}
+                    {/* Main Report Column with Clean Independent Month Selector */}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#008b8b]">
-                      <div className="inline-flex items-center justify-center bg-transparent border border-white/80 rounded-lg px-3 py-1 hover:border-white transition-colors cursor-pointer shadow-sm">
+                      <div className="inline-flex items-center justify-center bg-teal-800/80 border border-white/80 rounded-lg px-3 py-1 hover:border-white transition-colors cursor-pointer shadow-sm">
                         <select 
                           value={colMonthMain} 
                           onChange={(e) => setColMonthMain(e.target.value)} 
@@ -696,11 +696,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       </div>
                     </th>
 
-                    {/* Targets Column with Transparent Border Pill Selector */}
+                    {/* Targets Column with Clean Independent Selector */}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#008b8b]">
                       <div className="flex items-center justify-center gap-2">
                         <span>TARGETS</span>
-                        <div className="inline-flex items-center justify-center bg-transparent border border-white/80 rounded-lg px-2.5 py-0.5 hover:border-white transition-colors cursor-pointer shadow-sm">
+                        <div className="inline-flex items-center justify-center bg-teal-800/80 border border-white/80 rounded-lg px-2.5 py-0.5 hover:border-white transition-colors cursor-pointer shadow-sm">
                           <select 
                             value={headerTargetMode} 
                             onChange={(e) => setHeaderTargetMode(e.target.value)}
@@ -722,9 +722,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
 
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#008b8b]">ACHIEVEMENT (%)</th>
                     
-                    {/* Comparison Column 1 Pill Selector */}
+                    {/* Comparison Column 1 Independent Month Selector */}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#008b8b]">
-                      <div className="inline-flex items-center justify-center bg-transparent border border-white/80 rounded-lg px-3 py-1 hover:border-white transition-colors cursor-pointer shadow-sm">
+                      <div className="inline-flex items-center justify-center bg-teal-800/80 border border-white/80 rounded-lg px-3 py-1 hover:border-white transition-colors cursor-pointer shadow-sm">
                         <select 
                           value={colMonth1} 
                           onChange={(e) => setColMonth1(e.target.value)} 
@@ -743,9 +743,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       </div>
                     </th>
 
-                    {/* Comparison Column 2 Pill Selector */}
+                    {/* Comparison Column 2 Independent Month Selector */}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#008b8b]">
-                      <div className="inline-flex items-center justify-center bg-transparent border border-white/80 rounded-lg px-3 py-1 hover:border-white transition-colors cursor-pointer shadow-sm">
+                      <div className="inline-flex items-center justify-center bg-teal-800/80 border border-white/80 rounded-lg px-3 py-1 hover:border-white transition-colors cursor-pointer shadow-sm">
                         <select 
                           value={colMonth2} 
                           onChange={(e) => setColMonth2(e.target.value)} 
