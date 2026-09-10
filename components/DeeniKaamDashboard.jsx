@@ -162,8 +162,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [activeViewMode, setActiveViewMode] = useState("table"); 
   const [activeTab, setActiveTab] = useState("Monthly Report");
   
-  // Selected Month Dropdown state
-  const [selectedMonth, setSelectedMonth] = useState("2026-07"); 
+  // Table Header Inline Month Selector state (Default to 2026-07 or first available)
+  const [tableSelectedMonth, setTableSelectedMonth] = useState("2026-07"); 
   
   const [region, setRegion] = useState(officeUser?.region && officeUser.region.toLowerCase() !== "all" ? officeUser.region : "");
   const [state, setState] = useState(officeUser?.state && officeUser.state.toLowerCase() !== "all" ? officeUser.state : "");
@@ -221,6 +221,12 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
           };
         }).filter(Boolean);
         setRawData(processed);
+        
+        // Set default table month to the latest available if default doesn't exist
+        const months = [...new Set(processed.map(r => r.NormalizedMonth).filter(Boolean))].sort();
+        if (months.length > 0 && !months.includes("2026-07")) {
+          setTableSelectedMonth(months[months.length - 1]);
+        }
       } else {
         setFetchError("Data stream empty.");
       }
@@ -267,7 +273,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return [...new Set(subset.map(m => m.field))].sort();
   }, [selectedDeeniKaam]);
 
-  // Available months from rawData for dropdown
   const availableMonths = useMemo(() => {
     const months = [...new Set(rawData.map(r => r.NormalizedMonth).filter(Boolean))];
     return months.sort().reverse();
@@ -281,12 +286,45 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return "COUNTRY";
   }, [region, state, division, district]);
 
+  // Accurate SUM Aggregation Engine for India > Region > State > Division hierarchy per Field and Month
   const processedTableData = useMemo(() => {
-    if (!Array.isArray(rawData)) return [];
-    
-    const activeMonth = selectedMonth || (rawData.length > 0 ? rawData[0].NormalizedMonth : "");
+    if (!Array.isArray(rawData) || rawData.length === 0) return [];
 
-    const baseFiltered = rawData.filter((row) => {
+    const activeMonth = tableSelectedMonth;
+
+    // Helper to get previous month for comparison
+    const getPreviousMonth = (moStr) => {
+      if (!moStr || !/^\d{4}-\d{2}$/.test(moStr)) return "";
+      const [yr, mo] = moStr.split("-").map(Number);
+      let d = new Date(yr, mo - 2, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    };
+    const prevMonth = getPreviousMonth(activeMonth);
+
+    // Determine grouping sub-key and left column value based on active filters
+    // If no region/state/division/district -> Left column is "India", group by Field across all India.
+    // If Region selected -> Left column shows "State" names, group by State + Field.
+    // If State selected -> Left column shows "Division" names, group by Division + Field.
+    // If Division selected -> Left column shows "District" names, group by District + Field.
+    // If District selected -> Left column is hidden, group by Field for that District.
+    const getLeftColName = (r) => {
+      if (district) return "";
+      if (division) return r["District"] || "-";
+      if (state) return r["Division"] || "-";
+      if (region) return r["State"] || "-";
+      return "India";
+    };
+
+    const getGroupSubKey = (r) => {
+      if (district) return r["District"] || "-";
+      if (division) return r["District"] || "-";
+      if (state) return r["Division"] || "-";
+      if (region) return r["State"] || "-";
+      return "India";
+    };
+
+    // Filter rawData by UI dropdown filters (Category, Deeni Kaam, Field, Search, Geographic filters)
+    const filteredRows = rawData.filter((row) => {
       if (!row) return false;
       const matchRegion = !region || sameClient(row["Region"], region);
       const matchState = !state || sameClient(row["State"], state);
@@ -302,120 +340,121 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       const fieldVal = row["Fileds"] || "";
       const matchField = !selectedField || sameClient(fieldVal, selectedField);
 
-      const matchMonth = !activeMonth || row.NormalizedMonth === activeMonth;
-
       const matchSearch = !searchTerm || JSON.stringify(row).toLowerCase().includes(searchTerm.toLowerCase().trim());
-      return matchRegion && matchState && matchDivision && matchDistrict && matchCat && matchDeeniKaam && matchField && matchMonth && matchSearch;
+      return matchRegion && matchState && matchDivision && matchDistrict && matchCat && matchDeeniKaam && matchField && matchSearch;
     });
 
-    const getLeftColName = (r) => {
-      if (district) return "";
-      if (division) return r["District"] || "-";
-      if (state) return r["Division"] || "-";
-      if (region) return r["State"] || "-";
-      return "India";
-    };
+    // Collect all unique fields that match current category/deeni kaam filters
+    const validFieldsMap = {};
+    MASTER_CATEGORIES_MAP.forEach(m => {
+      if (selectedCategory && !sameClient(m.category, selectedCategory)) return;
+      if (selectedDeeniKaam && !sameClient(m.deeniKaam, selectedDeeniKaam)) return;
+      if (selectedField && !sameClient(m.field, selectedField)) return;
+      validFieldsMap[m.field] = { category: m.category, deeniKaam: m.deeniKaam };
+    });
 
-    // Calculate previous month for comparison
-    const getPreviousMonth = (moStr) => {
-      if (!moStr || !/^\d{4}-\d{2}$/.test(moStr)) return "";
-      const [yr, mo] = moStr.split("-").map(Number);
-      let d = new Date(yr, mo - 2, 1);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    };
+    // Also include any fields from filteredRows that match
+    filteredRows.forEach(r => {
+      const fld = r["Fileds"];
+      if (fld && !validFieldsMap[fld]) {
+        if (!selectedField || sameClient(fld, selectedField)) {
+          validFieldsMap[fld] = { category: r["Category"], deeniKaam: r["Deeni Kaam"] };
+        }
+      }
+    });
 
-    const prevMonth = getPreviousMonth(activeMonth);
+    // Determine distinct sub-entities (left column values) to display
+    // If Region is selected, we want all States inside that Region.
+    // If State is selected, all Divisions inside that State.
+    // If Division is selected, all Districts inside that Division.
+    // If nothing selected, just ["India"].
+    const subEntitiesSet = new Set();
+    filteredRows.forEach(r => {
+      subEntitiesSet.add(getLeftColName(r));
+    });
+    const subEntities = subEntitiesSet.size > 0 ? [...subEntitiesSet].filter(Boolean).sort() : ["India"];
 
-    const getAggregatedValForMonth = (targetMo, groupKeyFilter, subFilterName, isTargetOrAch = false) => {
-      let totalRep = 0;
-      let totalTarget = 0;
+    const resultList = [];
 
-      rawData.forEach(r => {
-        if (!r) return;
-        const mo = r.NormalizedMonth || "";
-        if (targetMo && mo !== targetMo) return;
+    // For each sub-entity and each valid field, SUM the reports for activeMonth and prevMonth
+    subEntities.forEach(subEntity => {
+      Object.keys(validFieldsMap).forEach(fldName => {
+        const meta = validFieldsMap[fldName];
 
-        if (region && !sameClient(r["Region"], region)) return;
-        if (state && !sameClient(r["State"], state)) return;
-        if (division && !sameClient(r["Division"], division)) return;
-        if (district && !sameClient(r["District"], district)) return;
+        // Sum for activeMonth
+        let sumActive = 0;
+        let sumTarget = 0;
+        let sumPrev = 0;
 
-        const fld = String(r["Fileds"] || "").trim();
-        let matchesGroup = false;
+        filteredRows.forEach(r => {
+          if (!r) return;
+          if (String(r["Fileds"] || "").trim() !== fldName) return;
 
-        if (district) matchesGroup = fld === groupKeyFilter;
-        else if (division) matchesGroup = String(r["District"] || "").trim() === subFilterName && fld === groupKeyFilter;
-        else if (state) matchesGroup = String(r["Division"] || "").trim() === subFilterName && fld === groupKeyFilter;
-        else if (region) matchesGroup = String(r["State"] || "").trim() === subFilterName && fld === groupKeyFilter;
-        else matchesGroup = fld === groupKeyFilter;
+          const ent = getLeftColName(r);
+          if (subEntity !== "India" && ent !== subEntity) return;
 
-        if (matchesGroup) {
-          totalRep += r.NumericReport || 0;
-          let baseTarget = r.Target || 0;
-          if (selectedTargetPct === "26%") baseTarget = baseTarget * 0.26;
-          else if (selectedTargetPct === "52%") baseTarget = baseTarget * 0.52;
-          totalTarget += baseTarget;
+          const mo = r.NormalizedMonth || "";
+          const repVal = r.NumericReport || 0;
+          const targetVal = r.Target || 0;
+
+          if (mo === activeMonth) {
+            sumActive += repVal;
+            let baseT = targetVal;
+            if (selectedTargetPct === "26%") baseT = baseT * 0.26;
+            else if (selectedTargetPct === "52%") baseT = baseT * 0.52;
+            sumTarget += baseT;
+          }
+
+          if (prevMonth && mo === prevMonth) {
+            sumPrev += repVal;
+          }
+        });
+
+        // Only include if there is data or if it's explicitly matched
+        if (sumActive > 0 || sumPrev > 0 || !selectedMonth) {
+          let v1 = sumPrev;
+          let v2 = sumActive;
+
+          if (activeTab === "Average Report" || activeViewMode === "average") {
+            v1 = Math.round(v1 / 2);
+            v2 = Math.round(v2 / 2);
+          } else if (activeTab === "Quarterly Report") {
+            v1 = v1 * 3;
+            v2 = v2 * 3;
+          }
+
+          let diffPercent = 0;
+          if (v1 > 0) {
+            diffPercent = ((v2 - v1) / v1) * 100;
+          } else if (v1 === 0 && v2 > 0) {
+            diffPercent = 100;
+          } else if (v1 > 0 && v2 === 0) {
+            diffPercent = -100;
+          }
+
+          let compStr = `${diffPercent >= 0 ? "+" : ""}${diffPercent.toFixed(1)}%`;
+          let targetRounded = Math.round(sumTarget);
+          let achPct = targetRounded > 0 ? ((sumActive / targetRounded) * 100).toFixed(1) + "%" : "-";
+
+          resultList.push({
+            LeftColValue: subEntity,
+            DeeniKaamName: meta.deeniKaam,
+            DeeniActivity: fldName,
+            DynamicReportValue: sumActive,
+            DynamicTarget: targetRounded,
+            DynamicAchievement: achPct,
+            Val1: v1,
+            Val2: v2,
+            CalculatedComparison: compStr,
+            PrevMonthLabel: formatMonthYearLabel(prevMonth),
+            ActiveMonthLabel: formatMonthYearLabel(activeMonth)
+          });
         }
       });
-
-      if (isTargetOrAch) {
-        return { target: Math.round(totalTarget), report: totalRep };
-      }
-      return totalRep;
-    };
-
-    const aggregatedMap = {};
-    baseFiltered.forEach(row => {
-      if (!row) return;
-      const fld = String(row["Fileds"] || "").trim();
-      const dkName = String(row["Deeni Kaam"] || "").trim();
-      const leftVal = getLeftColName(row);
-      const compositeKey = `${leftVal}|${dkName}|${fld}`;
-
-      if (!aggregatedMap[compositeKey]) {
-        const curRep = row.NumericReport || 0;
-        const targetAchObj = { target: row.Target || 0, report: curRep };
-
-        let v1 = prevMonth ? getAggregatedValForMonth(prevMonth, fld, leftVal) : curRep;
-        let v2 = curRep;
-
-        if (activeTab === "Average Report" || activeViewMode === "average") {
-          v1 = Math.round(v1 / 2);
-          v2 = Math.round(v2 / 2);
-        } else if (activeTab === "Quarterly Report") {
-          v1 = v1 * 3;
-          v2 = v2 * 3;
-        }
-
-        let diffPercent = 0;
-        if (v1 > 0) {
-          diffPercent = ((v2 - v1) / v1) * 100;
-        } else if (v1 === 0 && v2 > 0) {
-          diffPercent = 100;
-        } else if (v1 > 0 && v2 === 0) {
-          diffPercent = -100;
-        }
-
-        let compStr = `${diffPercent >= 0 ? "+" : ""}${diffPercent.toFixed(1)}%`;
-
-        aggregatedMap[compositeKey] = {
-          LeftColValue: leftVal,
-          DeeniKaamName: dkName,
-          DeeniActivity: fld,
-          DynamicMonthDisplay: formatMonthYearLabel(activeMonth),
-          DynamicReportValue: curRep,
-          DynamicTarget: targetAchObj.target,
-          DynamicAchievement: targetAchObj.target > 0 ? ((curRep / targetAchObj.target) * 100).toFixed(1) + "%" : "-",
-          Val1: v1,
-          Val2: v2,
-          CalculatedComparison: compStr,
-          PrevMonthLabel: formatMonthYearLabel(prevMonth)
-        };
-      }
     });
 
-    return Object.values(aggregatedMap);
-  }, [rawData, region, state, division, district, selectedCategory, selectedDeeniKaam, selectedField, selectedTargetPct, searchTerm, selectedMonth, activeTab, activeViewMode]);
+    return resultList;
+  }, [rawData, region, state, division, district, selectedCategory, selectedDeeniKaam, selectedField, selectedTargetPct, searchTerm, tableSelectedMonth, activeTab, activeViewMode]);
 
   const pagedRows = useMemo(() => {
     if (!Array.isArray(processedTableData)) return [];
@@ -585,11 +624,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-5 border-b border-slate-100 pb-4">
                   <div className="flex items-center gap-3">
                     <Filter className="w-5 h-5 text-teal-700" />
-                    <h2 className="text-sm font-bold text-slate-800 tracking-widest uppercase">Global Filters & Month Picker</h2>
+                    <h2 className="text-sm font-bold text-slate-800 tracking-widest uppercase">Global Filters & Options</h2>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-10 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-9 gap-3">
                   <div className="col-span-2 md:col-span-1" data-html2canvas-ignore="true">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Search</label>
                     <div className="relative">
@@ -598,17 +637,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     </div>
                   </div>
 
-                  {/* Month & Year Dropdown Filter */}
-                  <div className="flex flex-col flex-1 min-w-[120px]">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Month & Year</label>
-                    <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
-                      <option value="">All Months</option>
-                      {availableMonths.map(m => <option key={m} value={m}>{formatMonthYearLabel(m)}</option>)}
-                    </select>
-                  </div>
-
                   {/* Category Filter */}
-                  <div className="flex flex-col flex-1 min-w-[110px]">
+                  <div className="flex flex-col flex-1 min-w-[120px]">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Category</label>
                     <select value={selectedCategory} onChange={(e) => { setSelectedCategory(e.target.value); setSelectedDeeniKaam(""); setSelectedField(""); }} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
                       <option value="">All Categories</option>
@@ -617,7 +647,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   </div>
 
                   {/* Deeni Kaam Filter */}
-                  <div className="flex flex-col flex-1 min-w-[120px]">
+                  <div className="flex flex-col flex-1 min-w-[130px]">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Deeni Kaam</label>
                     <select value={selectedDeeniKaam} onChange={(e) => { setSelectedDeeniKaam(e.target.value); setSelectedField(""); }} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
                       <option value="">All Deeni Kaam</option>
@@ -626,7 +656,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   </div>
 
                   {/* Fields Filter */}
-                  <div className="flex flex-col flex-1 min-w-[120px]">
+                  <div className="flex flex-col flex-1 min-w-[130px]">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Fields</label>
                     <select value={selectedField} onChange={(e) => setSelectedField(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
                       <option value="">All Fields</option>
@@ -650,7 +680,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     { label: "Division", val: division, set: handleSetDivision, opts: uniqValues(rawData.filter(x=>(!region||sameClient(x["Region"],region))&&(!state||sameClient(x["State"],state))), "Division") },
                     { label: "District", val: district, set: setDistrict, opts: uniqValues(rawData.filter(x=>(!region||sameClient(x["Region"],region))&&(!state||sameClient(x["State"],state))&&(!division||sameClient(x["Division"],division))), "District") }
                   ].map((f, i) => (
-                    <div key={i} className="flex flex-col flex-1 min-w-[110px]">
+                    <div key={i} className="flex flex-col flex-1 min-w-[120px]">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{f.label}</label>
                       <select value={f.val} onChange={(e) => f.set(e.target.value)} disabled={officeUser?.[f.label.toLowerCase()] && officeUser[f.label.toLowerCase()].toLowerCase() !== "all"} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer disabled:bg-slate-50 disabled:text-slate-400">
                         <option value="">{f.val || "All"}</option>
@@ -715,16 +745,27 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     )}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">DEENI KAAM</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">FIELDS</th>
+                    
+                    {/* INLINE MONTH SELECTOR IN TABLE HEADER */}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
-                      {formatMonthYearLabel(selectedMonth)}
+                      <select 
+                        value={tableSelectedMonth} 
+                        onChange={(e) => setTableSelectedMonth(e.target.value)} 
+                        className="bg-[#006666] text-white text-xs font-bold py-1 px-2 rounded border border-teal-500 outline-none cursor-pointer"
+                      >
+                        {availableMonths.map(m => (
+                          <option key={m} value={m} className="bg-white text-slate-800">{formatMonthYearLabel(m)}</option>
+                        ))}
+                      </select>
                     </th>
+
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">TARGETS</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">ACHIEVEMENT (%)</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
                       {formatMonthYearLabel(pagedRows[0]?.PrevMonthLabel || "Prev Month")}
                     </th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
-                      {formatMonthYearLabel(selectedMonth)}
+                      {formatMonthYearLabel(tableSelectedMonth)}
                     </th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider text-center bg-[#007a7a]">COMPARISON (%)</th>
                   </tr>
