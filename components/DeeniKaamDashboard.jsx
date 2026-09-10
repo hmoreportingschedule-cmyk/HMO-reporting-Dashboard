@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useMemo, useTransition } from "react";
 import Papa from "papaparse";
-import { LogOut, RefreshCw, Filter, Calendar, Search, Activity, ArrowLeft, Download, BookOpenCheck, Image as ImageIcon, Clock, LayoutDashboard, BarChart3, TrendingUp, Target } from "lucide-react";
+import { LogOut, RefreshCw, Filter, Search, Activity, ArrowLeft, Download, BookOpenCheck, Image as ImageIcon, Clock, LayoutDashboard, BarChart3, TrendingUp, Target } from "lucide-react";
 import * as XLSX from "xlsx";
 import pptxgen from "pptxgenjs";
 import html2canvas from "html2canvas";
@@ -169,7 +169,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [activeViewMode, setActiveViewMode] = useState("table"); 
   const [activeTab, setActiveTab] = useState("Monthly Report");
   
-  const [colMonthMain, setColMonthMain] = useState("2026-11"); 
+  const [colMonthMain, setColMonthMain] = useState("2026-12"); 
   const [colMonth1, setColMonth1] = useState("2026-11"); 
   const [colMonth2, setColMonth2] = useState("2026-12"); 
   
@@ -283,7 +283,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return "COUNTRY";
   }, [region, state, division, district]);
 
-  // Accurate SUM Aggregation Engine for India > Region > State > Division hierarchy per Field
   const processedTableData = useMemo(() => {
     if (!Array.isArray(rawData) || rawData.length === 0) return [];
 
@@ -675,93 +674,61 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">DEENI KAAM</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">FIELDS</th>
                     
-                    {/* Main Report Column with Clean Independent Month Selector */}
+                    {/* Main Report Column Month Selector */}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#008b8b]">
-                      <div className="inline-flex items-center justify-center bg-teal-800/80 border border-white/80 rounded-lg px-3 py-1 hover:border-white transition-colors cursor-pointer shadow-sm">
-                        <select 
-                          value={colMonthMain} 
-                          onChange={(e) => setColMonthMain(e.target.value)} 
-                          className="bg-transparent text-white text-xs font-bold outline-none cursor-pointer appearance-none pr-5 text-center"
-                          style={{
-                            backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                            backgroundRepeat: 'no-repeat',
-                            backgroundPosition: 'right 2px center',
-                            backgroundSize: '12px'
-                          }}
-                        >
-                          {availableMonths.map(m => (
-                            <option key={m} value={m} className="bg-slate-800 text-white font-semibold">{formatMonthYearLabel(m)}</option>
-                          ))}
-                        </select>
-                      </div>
+                      <select 
+                        value={colMonthMain} 
+                        onChange={(e) => setColMonthMain(e.target.value)} 
+                        className="bg-teal-900 text-white text-xs font-bold py-1.5 px-3 rounded-lg border border-white/70 outline-none cursor-pointer shadow-sm hover:bg-teal-950 transition-colors"
+                      >
+                        {availableMonths.map(m => (
+                          <option key={m} value={m} className="bg-slate-900 text-white font-bold">{formatMonthYearLabel(m)}</option>
+                        ))}
+                      </select>
                     </th>
 
-                    {/* Targets Column with Clean Independent Selector */}
+                    {/* Targets Column Selector */}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#008b8b]">
                       <div className="flex items-center justify-center gap-2">
                         <span>TARGETS</span>
-                        <div className="inline-flex items-center justify-center bg-teal-800/80 border border-white/80 rounded-lg px-2.5 py-0.5 hover:border-white transition-colors cursor-pointer shadow-sm">
-                          <select 
-                            value={headerTargetMode} 
-                            onChange={(e) => setHeaderTargetMode(e.target.value)}
-                            className="bg-transparent text-white text-[11px] font-bold outline-none cursor-pointer appearance-none pr-4 text-center"
-                            style={{
-                              backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                              backgroundRepeat: 'no-repeat',
-                              backgroundPosition: 'right 1px center',
-                              backgroundSize: '10px'
-                            }}
-                          >
-                            <option value="" className="bg-slate-800 text-white font-semibold">Std</option>
-                            <option value="26%" className="bg-slate-800 text-white font-semibold">26%</option>
-                            <option value="52%" className="bg-slate-800 text-white font-semibold">52%</option>
-                          </select>
-                        </div>
+                        <select 
+                          value={headerTargetMode} 
+                          onChange={(e) => setHeaderTargetMode(e.target.value)}
+                          className="bg-teal-900 text-white text-xs font-bold py-1 px-2 rounded-lg border border-white/70 outline-none cursor-pointer shadow-sm hover:bg-teal-950 transition-colors"
+                        >
+                          <option value="" className="bg-slate-900 text-white font-bold">Std</option>
+                          <option value="26%" className="bg-slate-900 text-white font-bold">26%</option>
+                          <option value="52%" className="bg-slate-900 text-white font-bold">52%</option>
+                        </select>
                       </div>
                     </th>
 
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#008b8b]">ACHIEVEMENT (%)</th>
                     
-                    {/* Comparison Column 1 Independent Month Selector */}
+                    {/* Comparison Column 1 Selector */}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#008b8b]">
-                      <div className="inline-flex items-center justify-center bg-teal-800/80 border border-white/80 rounded-lg px-3 py-1 hover:border-white transition-colors cursor-pointer shadow-sm">
-                        <select 
-                          value={colMonth1} 
-                          onChange={(e) => setColMonth1(e.target.value)} 
-                          className="bg-transparent text-white text-xs font-bold outline-none cursor-pointer appearance-none pr-5 text-center"
-                          style={{
-                            backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                            backgroundRepeat: 'no-repeat',
-                            backgroundPosition: 'right 2px center',
-                            backgroundSize: '12px'
-                          }}
-                        >
-                          {availableMonths.map(m => (
-                            <option key={m} value={m} className="bg-slate-800 text-white font-semibold">{formatMonthYearLabel(m)}</option>
-                          ))}
-                        </select>
-                      </div>
+                      <select 
+                        value={colMonth1} 
+                        onChange={(e) => setColMonth1(e.target.value)} 
+                        className="bg-teal-900 text-white text-xs font-bold py-1.5 px-3 rounded-lg border border-white/70 outline-none cursor-pointer shadow-sm hover:bg-teal-950 transition-colors"
+                      >
+                        {availableMonths.map(m => (
+                          <option key={m} value={m} className="bg-slate-900 text-white font-bold">{formatMonthYearLabel(m)}</option>
+                        ))}
+                      </select>
                     </th>
 
-                    {/* Comparison Column 2 Independent Month Selector */}
+                    {/* Comparison Column 2 Selector */}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#008b8b]">
-                      <div className="inline-flex items-center justify-center bg-teal-800/80 border border-white/80 rounded-lg px-3 py-1 hover:border-white transition-colors cursor-pointer shadow-sm">
-                        <select 
-                          value={colMonth2} 
-                          onChange={(e) => setColMonth2(e.target.value)} 
-                          className="bg-transparent text-white text-xs font-bold outline-none cursor-pointer appearance-none pr-5 text-center"
-                          style={{
-                            backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                            backgroundRepeat: 'no-repeat',
-                            backgroundPosition: 'right 2px center',
-                            backgroundSize: '12px'
-                          }}
-                        >
-                          {availableMonths.map(m => (
-                            <option key={m} value={m} className="bg-slate-800 text-white font-semibold">{formatMonthYearLabel(m)}</option>
-                          ))}
-                        </select>
-                      </div>
+                      <select 
+                        value={colMonth2} 
+                        onChange={(e) => setColMonth2(e.target.value)} 
+                        className="bg-teal-900 text-white text-xs font-bold py-1.5 px-3 rounded-lg border border-white/70 outline-none cursor-pointer shadow-sm hover:bg-teal-950 transition-colors"
+                      >
+                        {availableMonths.map(m => (
+                          <option key={m} value={m} className="bg-slate-900 text-white font-bold">{formatMonthYearLabel(m)}</option>
+                        ))}
+                      </select>
                     </th>
 
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider text-center bg-[#008b8b]">COMPARISON (%)</th>
