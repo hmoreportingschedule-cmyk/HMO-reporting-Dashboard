@@ -209,16 +209,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       return matchRegion && matchState && matchDivision && matchDistrict && matchCat && matchField && matchSearch;
     });
 
-    // Determine grouping based on filter hierarchy
-    const getGroupKey = (r) => {
-      const fld = String(r["Fileds"] || r["Fields"] || r["Deeni Activities"] || "").trim();
-      if (division) return `${String(r["District"] || "").trim()}|${fld}`;
-      if (state) return `${String(r["Division"] || "").trim()}|${fld}`;
-      if (region) return `${String(r["State"] || "").trim()}|${fld}`;
-      return fld; // India level total grouped by activity
-    };
-
     const getLeftColName = (r) => {
+      if (district) return "";
       if (division) return r["District"] || "-";
       if (state) return r["Division"] || "-";
       if (region) return r["State"] || "-";
@@ -237,7 +229,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         const fld = String(r["Fileds"] || r["Fields"] || r["Deeni Activities"] || "").trim();
         let matchesGroup = false;
 
-        if (division) matchesGroup = String(r["District"] || "").trim() === subFilterName && fld === groupKeyFilter;
+        if (district) matchesGroup = fld === groupKeyFilter;
+        else if (division) matchesGroup = String(r["District"] || "").trim() === subFilterName && fld === groupKeyFilter;
         else if (state) matchesGroup = String(r["Division"] || "").trim() === subFilterName && fld === groupKeyFilter;
         else if (region) matchesGroup = String(r["State"] || "").trim() === subFilterName && fld === groupKeyFilter;
         else matchesGroup = fld === groupKeyFilter;
@@ -579,13 +572,14 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
               <table className="min-w-full text-left text-[11px] lg:text-xs">
                 <thead className="bg-[#008b8b]">
                   <tr>
-                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">
-                      {!region && !state && !division && !district && "COUNTRY"}
-                      {region && !state && !division && !district && "REGION"}
-                      {state && !division && !district && "STATE"}
-                      {division && !district && "DIVISION"}
-                      {district && "DISTRICT"}
-                    </th>
+                    {!district && (
+                      <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">
+                        {!region && !state && !division && "COUNTRY"}
+                        {region && !state && !division && "REGION"}
+                        {state && !division && "STATE"}
+                        {division && "DIVISION"}
+                      </th>
+                    )}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">DEENI ACTIVITIES</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
                       {formatMonthYearLabel(endMonth || startMonth || "Month")}
@@ -604,7 +598,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 <tbody className="divide-y divide-slate-100">
                   {pagedRows.length > 0 ? pagedRows.map((row, idx) => (
                     <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-2 py-2 font-bold text-teal-800 leading-tight border-r border-slate-100 text-center">{row?.LeftColValue || "-"}</td>
+                      {!district && (
+                        <td className="px-2 py-2 font-bold text-teal-800 leading-tight border-r border-slate-100 text-center">{row?.LeftColValue || "-"}</td>
+                      )}
                       
                       <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100 text-center">{row?.DeeniActivity || "-"}</td>
                       
@@ -621,7 +617,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     </tr>
                   )) : (
                     <tr>
-                      <td colSpan="8" className="px-6 py-12 text-center text-slate-500 text-xs uppercase tracking-widest">
+                      <td colSpan={district ? 7 : 8} className="px-6 py-12 text-center text-slate-500 text-xs uppercase tracking-widest">
                         <div className="flex flex-col items-center justify-center gap-3">
                           <Activity className="w-6 h-6 opacity-40 text-teal-600" />
                           <span>{loading ? "Establishing connection..." : "No matching telemetry found"}</span>
