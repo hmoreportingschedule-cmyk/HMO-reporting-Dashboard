@@ -12,20 +12,54 @@ const SHEET_URLS = [
   "https://docs.google.com/spreadsheets/d/1yWVgL9IVGrQFElLNeO8X_UGAIDSAGF7P8M31gGtoki8/export?format=csv"
 ];
 
-const FIELD_TO_DEENIKAAM_MAP = {
-  "Total Active Muballigh": { category: "Basic", deeniKaam: "Tanzimi Malumat" },
-  "Total Moallimin": { category: "Basic", deeniKaam: "Tanzimi Malumat" },
-  "Total Masjid": { category: "Basic", deeniKaam: "Tanzimi Malumat" },
-  "Apni Masjid": { category: "Basic", deeniKaam: "Tanzimi Malumat" },
-  "Total Zeili Halqe": { category: "Basic", deeniKaam: "Tanzimi Malumat" },
-  "Total Zaili Halqe Taqarrur": { category: "Basic", deeniKaam: "Tanzimi Malumat" },
-  "Fajr Ke Liye Jagaen": { category: "Daily", deeniKaam: "Fajr Ke Liye Jagaen" },
-  "Tafseer Sunna/Sunnana": { category: "Daily", deeniKaam: "Tafseer Sunna/Sunnana" },
-  "Masjid Dars": { category: "Daily", deeniKaam: "Dars" },
-  "Area Dars": { category: "Daily", deeniKaam: "Dars" },
-  "Ghar Dars": { category: "Daily", deeniKaam: "Dars" },
-  "Total Dars": { category: "Daily", deeniKaam: "Dars" }
-};
+// MASTER MAPPING DICTIONARY BASED ON YOUR EXCEL TEMPLATE
+const MASTER_CATEGORIES_MAP = [
+  { category: "Basic", deeniKaam: "Tanzimi Malumat", field: "Total Active Muballigh" },
+  { category: "Basic", deeniKaam: "Tanzimi Malumat", field: "Total Moallimin" },
+  { category: "Basic", deeniKaam: "Tanzimi Malumat", field: "Total Masjid" },
+  { category: "Basic", deeniKaam: "Tanzimi Malumat", field: "Apni Masjid" },
+  { category: "Basic", deeniKaam: "Tanzimi Malumat", field: "Total Zeili Halqe" },
+  { category: "Basic", deeniKaam: "Tanzimi Malumat", field: "Total Zaili Halqe Taqarrur" },
+  { category: "Daily", deeniKaam: "Fajr Ke Liye Jagaen", field: "Fajr Ke Liye Jagaen" },
+  { category: "Daily", deeniKaam: "Tafseer Sunna/Sunnana", field: "Tafseer Sunna/Sunnana" },
+  { category: "Daily", deeniKaam: "Dars", field: "Masjid Dars" },
+  { category: "Daily", deeniKaam: "Dars", field: "Area Dars" },
+  { category: "Daily", deeniKaam: "Dars", field: "Ghar Dars" },
+  { category: "Daily", deeniKaam: "Dars", field: "Total Dars" },
+  { category: "Daily", deeniKaam: "Madrasatul Madina Baligan", field: "Madrasatul Madina Baligan Tadad (Masjid)" },
+  { category: "Daily", deeniKaam: "Madrasatul Madina Baligan", field: "Madrasatul Madina Baligan Shurqa (Masjid)" },
+  { category: "Daily", deeniKaam: "Madrasatul Madina Baligan", field: "Madrasatul Madina Baligan Tadad (Others)" },
+  { category: "Daily", deeniKaam: "Madrasatul Madina Baligan", field: "Madrasatul Madina Baligan Shurqa (Others)" },
+  { category: "Daily", deeniKaam: "Madrasatul Madina Baligan", field: "Total Madrasarul Madina Baligan Tadad" },
+  { category: "Daily", deeniKaam: "Madrasatul Madina Baligan", field: "Total Madrasarul Madina Baligan Shurqa" },
+  { category: "Weekly", deeniKaam: "Haftwar Ijtima", field: "Haftwar Ijtima Tadad" },
+  { category: "Weekly", deeniKaam: "Haftwar Ijtima", field: "Haftwar Ijtima Shurqa" },
+  { category: "Weekly", deeniKaam: "Haftwar Ijtima", field: "Raat Guzarne Walo Ki Tadad" },
+  { category: "Weekly", deeniKaam: "Haftwar Ijtima", field: "Ijtima me Shurqa ki tadad 120 se zyada hai" },
+  { category: "Weekly", deeniKaam: "Madani Muzakirah", field: "Madani Muzakirah Maqaamat" },
+  { category: "Weekly", deeniKaam: "Madani Muzakirah", field: "Madani Muzakirah Shurqa" },
+  { category: "Weekly", deeniKaam: "Ek Din Raahe Khuda Me", field: "Ek Din Raahe Khuda Me Tadad" },
+  { category: "Weekly", deeniKaam: "Ek Din Raahe Khuda Me", field: "Ek Din Raahe Khuda Me Shurqa" },
+  { category: "Weekly", deeniKaam: "Madani Halqa", field: "Madani Halqa Tadad" },
+  { category: "Weekly", deeniKaam: "Madani Halqa", field: "Madani Halqa Shurqa" },
+  { category: "Weekly", deeniKaam: "Haftwar Risala", field: "Haftwar Risala Padhne Wale / Sunne Wale" },
+  { category: "Weekly", deeniKaam: "Alaqai Dora", field: "Alaqai Dora Kitni Baar" },
+  { category: "Monthly", deeniKaam: "Qafila", field: "3 Din Qafila Tadad" },
+  { category: "Monthly", deeniKaam: "Qafila", field: "3 Din Qafila Shurqa" },
+  { category: "Monthly", deeniKaam: "Qafila", field: "12 Din Qafila Tadad" },
+  { category: "Monthly", deeniKaam: "Qafila", field: "12 Din Qafila Shurqa" },
+  { category: "Monthly", deeniKaam: "Qafila", field: "1 Maah Qafila Tadad" },
+  { category: "Monthly", deeniKaam: "Qafila", field: "1 Maah Qafila Shurqa" },
+  { category: "Monthly", deeniKaam: "Qafila", field: "12 Maah Qafila Tadad" },
+  { category: "Monthly", deeniKaam: "Qafila", field: "12 Maah Qafila Shurqa" },
+  { category: "Monthly", deeniKaam: "Courses", field: "Short Courses (Gair Riyaeshi) Tadad" },
+  { category: "Monthly", deeniKaam: "Courses", field: "Short Courses (Gair Riyaeshi) Shurqa" },
+  { category: "Monthly", deeniKaam: "Courses", field: "Long Courses (Riyaeshi) Tadad" },
+  { category: "Monthly", deeniKaam: "Courses", field: "Long Courses (Riyaeshi) Shurqa" },
+  { category: "Monthly", deeniKaam: "Courses", field: "Total Courses Tadad" },
+  { category: "Monthly", deeniKaam: "Courses", field: "Total Courses Shurqa" },
+  { category: "Monthly", deeniKaam: "Neak Aamal", field: "Neak Aamal Risala Wasool" }
+];
 
 const parseSheet = (url) => {
   return new Promise((resolve) => {
@@ -170,9 +204,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
           let reportVal = Number(String(row["Report Value"] || row.report || "0").replace(/,/g, ""));
           let targetVal = Number(String(row["Target"] || "0").replace(/,/g, ""));
           let fld = String(row["Fileds"] || row["Fields"] || row["Deeni Activities"] || "").trim();
-          let mapping = FIELD_TO_DEENIKAAM_MAP[fld] || {};
-          let cat = String(row["Category"] || mapping.category || "Basic").trim();
-          let dk = String(row["Deeni Kaam"] || mapping.deeniKaam || "Tanzimi Malumat").trim();
+          
+          let foundMap = MASTER_CATEGORIES_MAP.find(m => sameClient(m.field, fld));
+          let cat = String(row["Category"] || foundMap?.category || "Basic").trim();
+          let dk = String(row["Deeni Kaam"] || foundMap?.deeniKaam || "Tanzimi Malumat").trim();
+
           return {
             ...row,
             "Category": cat,
@@ -211,28 +247,28 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
   };
 
-  // Dynamic Categories
+  // 1. Dynamic Categories from Master Map
   const availableCategories = useMemo(() => {
-    return uniqValues(rawData, "Category");
-  }, [rawData]);
+    return [...new Set(MASTER_CATEGORIES_MAP.map(m => m.category))].sort();
+  }, []);
 
-  // Dynamic Deeni Kaam filtered by Category
+  // 2. Dynamic Deeni Kaam filtered by Selected Category
   const availableDeeniKaam = useMemo(() => {
-    let subset = rawData;
+    let subset = MASTER_CATEGORIES_MAP;
     if (selectedCategory) {
-      subset = rawData.filter(x => sameClient(x?.["Category"], selectedCategory));
+      subset = MASTER_CATEGORIES_MAP.filter(m => sameClient(m.category, selectedCategory));
     }
-    return uniqValues(subset, "Deeni Kaam");
-  }, [rawData, selectedCategory]);
+    return [...new Set(subset.map(m => m.deeniKaam))].sort();
+  }, [selectedCategory]);
 
-  // Dynamic Fields filtered by Deeni Kaam
+  // 3. Dynamic Fields filtered by Selected Deeni Kaam
   const availableFields = useMemo(() => {
-    let subset = rawData;
+    let subset = MASTER_CATEGORIES_MAP;
     if (selectedDeeniKaam) {
-      subset = rawData.filter(x => sameClient(x?.["Deeni Kaam"], selectedDeeniKaam));
+      subset = MASTER_CATEGORIES_MAP.filter(m => sameClient(m.deeniKaam, selectedDeeniKaam));
     }
-    return uniqValues(subset, "Fileds");
-  }, [rawData, selectedDeeniKaam]);
+    return [...new Set(subset.map(m => m.field))].sort();
+  }, [selectedDeeniKaam]);
 
   const processedTableData = useMemo(() => {
     if (!Array.isArray(rawData)) return [];
