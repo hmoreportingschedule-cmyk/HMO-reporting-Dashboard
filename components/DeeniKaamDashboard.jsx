@@ -101,11 +101,17 @@ const formatMonthYearLabel = (val) => {
   return val;
 };
 
+// Universal Month & Year Parser supporting multiple formats from CSV/Sheets
 const parseRowMonth = (row) => {
   if (!row) return "";
-  let raw = String(row["Month"] || row["Date"] || row["Report Date"] || "").trim();
+  let raw = String(row["Month"] || row["Date"] || row["Report Date"] || row["ReportMonth"] || "").trim();
   if (!raw) return "";
+
   if (/^\d{4}-\d{2}$/.test(raw)) return raw;
+  if (/^\d{2}\/\d{4}$/.test(raw)) {
+    const [mo, yr] = raw.split("/");
+    return `${yr}-${mo}`;
+  }
 
   let parsed = Date.parse(raw);
   if (!isNaN(parsed)) {
@@ -276,6 +282,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return "COUNTRY";
   }, [region, state, division, district]);
 
+  // Robust SUM Aggregation Engine respecting selected months and hierarchy
   const processedTableData = useMemo(() => {
     if (!Array.isArray(rawData) || rawData.length === 0) return [];
 
@@ -577,7 +584,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   </div>
                 </div>
 
-                {/* Cleaned up Global Filters Bar (Deeni Kaam, Fields, Targets removed as requested) */}
                 <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                   <div className="col-span-2 md:col-span-1" data-html2canvas-ignore="true">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Search</label>
