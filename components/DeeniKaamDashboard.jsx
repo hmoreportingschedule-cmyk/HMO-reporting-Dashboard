@@ -101,7 +101,6 @@ const formatMonthYearLabel = (val) => {
   return val;
 };
 
-// Universal Month & Year Parser that detects any year (2023, 2024, 2025, 2026, etc.)
 const parseRowMonth = (row) => {
   if (!row) return "";
   let raw = String(row["Month"] || row["Date"] || row["Report Date"] || row["ReportMonth"] || "").trim();
@@ -124,7 +123,6 @@ const parseRowMonth = (row) => {
   let lower = raw.toLowerCase();
   const months = {jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'};
   
-  // Extract 4-digit year dynamically
   let matchYear = raw.match(/\b(20\d{2}|19\d{2})\b/);
   let yr = matchYear ? matchYear[0] : "2026";
 
@@ -171,9 +169,10 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [activeViewMode, setActiveViewMode] = useState("table"); 
   const [activeTab, setActiveTab] = useState("Monthly Report");
   
-  const [colMonthMain, setColMonthMain] = useState(""); 
-  const [colMonth1, setColMonth1] = useState(""); 
-  const [colMonth2, setColMonth2] = useState(""); 
+  // Independent Column Month Selectors with distinct initial defaults
+  const [colMonthMain, setColMonthMain] = useState("2026-07"); 
+  const [colMonth1, setColMonth1] = useState("2026-06"); 
+  const [colMonth2, setColMonth2] = useState("2026-07"); 
   
   const [headerTargetMode, setHeaderTargetMode] = useState("");
 
@@ -285,7 +284,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return "COUNTRY";
   }, [region, state, division, district]);
 
-  // Accurate SUM Aggregation Engine for India > Region > State > Division hierarchy per Field
+  // Accurate SUM Aggregation Engine for India > Region > State > Division hierarchy per Field with fully independent month calculations
   const processedTableData = useMemo(() => {
     if (!Array.isArray(rawData) || rawData.length === 0) return [];
 
@@ -677,7 +676,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">DEENI KAAM</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">FIELDS</th>
                     
-                    {/* Main Report Column with Dynamic Month/Year Selector */}
+                    {/* Main Report Column with Fully Independent Month Selector */}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
                       <select 
                         value={colMonthMain} 
@@ -708,7 +707,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
 
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">ACHIEVEMENT (%)</th>
                     
-                    {/* Comparison Column 1 Month Selector */}
+                    {/* Comparison Column 1 Independent Month Selector */}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
                       <select 
                         value={colMonth1} 
@@ -721,7 +720,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       </select>
                     </th>
 
-                    {/* Comparison Column 2 Month Selector */}
+                    {/* Comparison Column 2 Independent Month Selector */}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
                       <select 
                         value={colMonth2} 
