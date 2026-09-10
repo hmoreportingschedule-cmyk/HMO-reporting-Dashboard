@@ -162,7 +162,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [activeViewMode, setActiveViewMode] = useState("table"); 
   const [activeTab, setActiveTab] = useState("Monthly Report");
   
-  const [tableSelectedMonth, setTableSelectedMonth] = useState("2026-07"); 
+  // Two Month Selectors for the middle columns
+  const [colMonth1, setColMonth1] = useState("2026-06"); 
+  const [colMonth2, setColMonth2] = useState("2026-07"); 
   
   const [region, setRegion] = useState(officeUser?.region && officeUser.region.toLowerCase() !== "all" ? officeUser.region : "");
   const [state, setState] = useState(officeUser?.state && officeUser.state.toLowerCase() !== "all" ? officeUser.state : "");
@@ -222,8 +224,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         setRawData(processed);
         
         const months = [...new Set(processed.map(r => r.NormalizedMonth).filter(Boolean))].sort();
-        if (months.length > 0 && !months.includes("2026-07")) {
-          setTableSelectedMonth(months[months.length - 1]);
+        if (months.length > 0) {
+          if (!months.includes(colMonth2)) setColMonth2(months[months.length - 1]);
+          if (months.length > 1 && !months.includes(colMonth1)) setColMonth1(months[months.length - 2]);
         }
       } else {
         setFetchError("Data stream empty.");
@@ -284,18 +287,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return "COUNTRY";
   }, [region, state, division, district]);
 
+  // Accurate SUM Aggregation Engine for India > Region > State > Division hierarchy per Field for colMonth1 and colMonth2
   const processedTableData = useMemo(() => {
     if (!Array.isArray(rawData) || rawData.length === 0) return [];
-
-    const activeMonth = tableSelectedMonth;
-
-    const getPreviousMonth = (moStr) => {
-      if (!moStr || !/^\d{4}-\d{2}$/.test(moStr)) return "";
-      const [yr, mo] = moStr.split("-").map(Number);
-      let d = new Date(yr, mo - 2, 1);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    };
-    const prevMonth = getPreviousMonth(activeMonth);
 
     const getLeftColName = (r) => {
       if (district) return "";
@@ -354,9 +348,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       Object.keys(validFieldsMap).forEach(fldName => {
         const meta = validFieldsMap[fldName];
 
-        let sumActive = 0;
+        let sumVal1 = 0; // for colMonth1
+        let sumVal2 = 0; // for colMonth2
         let sumTarget = 0;
-        let sumPrev = 0;
 
         filteredRows.forEach(r => {
           if (!r) return;
@@ -369,22 +363,22 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
           const repVal = r.NumericReport || 0;
           const targetVal = r.Target || 0;
 
-          if (mo === activeMonth) {
-            sumActive += repVal;
+          if (colMonth1 && mo === colMonth1) {
+            sumVal1 += repVal;
+          }
+
+          if (colMonth2 && mo === colMonth2) {
+            sumVal2 += repVal;
             let baseT = targetVal;
             if (selectedTargetPct === "26%") baseT = baseT * 0.26;
             else if (selectedTargetPct === "52%") baseT = baseT * 0.52;
             sumTarget += baseT;
           }
-
-          if (prevMonth && mo === prevMonth) {
-            sumPrev += repVal;
-          }
         });
 
-        if (sumActive > 0 || sumPrev > 0 || (!selectedCategory && !selectedDeeniKaam && !selectedField)) {
-          let v1 = sumPrev;
-          let v2 = sumActive;
+        if (sumVal1 > 0 || sumVal2 > 0 || (!selectedCategory && !selectedDeeniKaam && !selectedField)) {
+          let v1 = sumVal1;
+          let v2 = sumVal2;
 
           if (activeTab === "Average Report" || activeViewMode === "average") {
             v1 = Math.round(v1 / 2);
@@ -405,27 +399,27 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
 
           let compStr = `${diffPercent >= 0 ? "+" : ""}${diffPercent.toFixed(1)}%`;
           let targetRounded = Math.round(sumTarget);
-          let achPct = targetRounded > 0 ? ((sumActive / targetRounded) * 100).toFixed(1) + "%" : "-";
+          let achPct = targetRounded > 0 ? ((sumVal2 / targetRounded) * 100).toFixed(1) + "%" : "-";
 
           resultList.push({
             LeftColValue: subEntity,
             DeeniKaamName: meta.deeniKaam,
             DeeniActivity: fldName,
-            DynamicReportValue: sumActive,
+            DynamicReportValue: sumVal2,
             DynamicTarget: targetRounded,
             DynamicAchievement: achPct,
             Val1: v1,
             Val2: v2,
             CalculatedComparison: compStr,
-            PrevMonthLabel: formatMonthYearLabel(prevMonth),
-            ActiveMonthLabel: formatMonthYearLabel(activeMonth)
+            ColMonth1Label: formatMonthYearLabel(colMonth1),
+            ColMonth2Label: formatMonthYearLabel(colMonth2)
           });
         }
       });
     });
 
     return resultList;
-  }, [rawData, region, state, division, district, selectedCategory, selectedDeeniKaam, selectedField, selectedTargetPct, searchTerm, tableSelectedMonth, activeTab, activeViewMode]);
+  }, [rawData, region, state, division, district, selectedCategory, selectedDeeniKaam, selectedField, selectedTargetPct, searchTerm, colMonth1, colMonth2, activeTab, activeViewMode]);
 
   const pagedRows = useMemo(() => {
     if (!Array.isArray(processedTableData)) return [];
@@ -717,11 +711,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">DEENI KAAM</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">FIELDS</th>
                     
-                    {/* INLINE MONTH SELECTOR IN TABLE HEADER */}
+                    {/* Achievement column (using colMonth2) */}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
                       <select 
-                        value={tableSelectedMonth} 
-                        onChange={(e) => setTableSelectedMonth(e.target.value)} 
+                        value={colMonth2} 
+                        onChange={(e) => setColMonth2(e.target.value)} 
                         className="bg-[#006666] text-white text-xs font-bold py-1 px-2 rounded border border-teal-500 outline-none cursor-pointer"
                       >
                         {availableMonths.map(m => (
@@ -732,12 +726,33 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
 
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">TARGETS</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">ACHIEVEMENT (%)</th>
+                    
+                    {/* Comparison Month 1 Selector */}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
-                      {formatMonthYearLabel(pagedRows[0]?.PrevMonthLabel || "Prev Month")}
+                      <select 
+                        value={colMonth1} 
+                        onChange={(e) => setColMonth1(e.target.value)} 
+                        className="bg-[#006666] text-white text-xs font-bold py-1 px-2 rounded border border-teal-500 outline-none cursor-pointer"
+                      >
+                        {availableMonths.map(m => (
+                          <option key={m} value={m} className="bg-white text-slate-800">{formatMonthYearLabel(m)}</option>
+                        ))}
+                      </select>
                     </th>
+
+                    {/* Comparison Month 2 Selector */}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
-                      {formatMonthYearLabel(tableSelectedMonth)}
+                      <select 
+                        value={colMonth2} 
+                        onChange={(e) => setColMonth2(e.target.value)} 
+                        className="bg-[#006666] text-white text-xs font-bold py-1 px-2 rounded border border-teal-500 outline-none cursor-pointer"
+                      >
+                        {availableMonths.map(m => (
+                          <option key={m} value={m} className="bg-white text-slate-800">{formatMonthYearLabel(m)}</option>
+                        ))}
+                      </select>
                     </th>
+
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider text-center bg-[#007a7a]">COMPARISON (%)</th>
                   </tr>
                 </thead>
