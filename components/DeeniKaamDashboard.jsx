@@ -209,24 +209,23 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       return matchRegion && matchState && matchDivision && matchDistrict && matchCat && matchField && matchSearch;
     });
 
+    // Determine grouping based on filter hierarchy
     const getGroupKey = (r) => {
       const fld = String(r["Fileds"] || r["Fields"] || r["Deeni Activities"] || "").trim();
-      if (district) return `${String(r["District"] || "").trim()}|${fld}`;
       if (division) return `${String(r["District"] || "").trim()}|${fld}`;
       if (state) return `${String(r["Division"] || "").trim()}|${fld}`;
       if (region) return `${String(r["State"] || "").trim()}|${fld}`;
-      return fld;
+      return fld; // India level total grouped by activity
     };
 
     const getLeftColName = (r) => {
-      if (district) return r["District"] || "-";
       if (division) return r["District"] || "-";
       if (state) return r["Division"] || "-";
       if (region) return r["State"] || "-";
       return "India";
     };
 
-    const getAggregatedValForMonth = (targetMo, groupKeyFilter, isTargetOrAch = false) => {
+    const getAggregatedValForMonth = (targetMo, groupKeyFilter, subFilterName, isTargetOrAch = false) => {
       let totalRep = 0;
       let totalTarget = 0;
 
@@ -237,10 +236,10 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         
         const fld = String(r["Fileds"] || r["Fields"] || r["Deeni Activities"] || "").trim();
         let matchesGroup = false;
-        if (district) matchesGroup = String(r["District"] || "").trim() === groupKeyFilter.split("|")[0];
-        else if (division) matchesGroup = String(r["District"] || "").trim() === groupKeyFilter.split("|")[0];
-        else if (state) matchesGroup = String(r["Division"] || "").trim() === groupKeyFilter.split("|")[0];
-        else if (region) matchesGroup = String(r["State"] || "").trim() === groupKeyFilter.split("|")[0];
+
+        if (division) matchesGroup = String(r["District"] || "").trim() === subFilterName && fld === groupKeyFilter;
+        else if (state) matchesGroup = String(r["Division"] || "").trim() === subFilterName && fld === groupKeyFilter;
+        else if (region) matchesGroup = String(r["State"] || "").trim() === subFilterName && fld === groupKeyFilter;
         else matchesGroup = fld === groupKeyFilter;
 
         if (matchesGroup) {
@@ -258,18 +257,18 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     const aggregatedMap = {};
     baseFiltered.forEach(row => {
       if (!row) return;
-      const gKey = getGroupKey(row);
+      const fld = String(row["Fileds"] || row["Fields"] || row["Deeni Activities"] || "").trim();
       const leftVal = getLeftColName(row);
-      const fld = row["Fileds"] || row["Fields"] || row["Deeni Activities"] || "-";
+      const compositeKey = `${leftVal}|${fld}`;
 
-      if (!aggregatedMap[gKey]) {
+      if (!aggregatedMap[compositeKey]) {
         const targetMo = endMonth || startMonth || row.NormalizedMonth || "";
         
-        const curRep = getAggregatedValForMonth(targetMo, gKey);
-        const targetAchObj = getAggregatedValForMonth(targetMo, gKey, true);
+        const curRep = getAggregatedValForMonth(targetMo, fld, leftVal);
+        const targetAchObj = getAggregatedValForMonth(targetMo, fld, leftVal, true);
 
-        let v1 = startMonth ? getAggregatedValForMonth(startMonth, gKey) : curRep;
-        let v2 = endMonth ? getAggregatedValForMonth(endMonth, gKey) : curRep;
+        let v1 = startMonth ? getAggregatedValForMonth(startMonth, fld, leftVal) : curRep;
+        let v2 = endMonth ? getAggregatedValForMonth(endMonth, fld, leftVal) : curRep;
 
         if (activeTab === "Average Report" || activeViewMode === "average") {
           v1 = Math.round(v1 / 2);
@@ -290,7 +289,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
 
         let compStr = `${diffPercent >= 0 ? "+" : ""}${diffPercent.toFixed(1)}%`;
 
-        aggregatedMap[gKey] = {
+        aggregatedMap[compositeKey] = {
           LeftColValue: leftVal,
           DeeniActivity: fld,
           DynamicMonthDisplay: formatMonthYearLabel(targetMo),
@@ -564,7 +563,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
             </main>
         </div>
 
-        {/* MAIN DATA GRID / TABLE SECTION (Full screen focus when Detailed Table Report is active) */}
+        {/* MAIN DATA GRID / TABLE SECTION */}
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pb-8 mt-2">
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm mt-2">
             <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 bg-[#e0f2f1] rounded-t-xl">
@@ -580,7 +579,13 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
               <table className="min-w-full text-left text-[11px] lg:text-xs">
                 <thead className="bg-[#008b8b]">
                   <tr>
-                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">COUNTRY</th>
+                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">
+                      {!region && !state && !division && !district && "COUNTRY"}
+                      {region && !state && !division && !district && "REGION"}
+                      {state && !division && !district && "STATE"}
+                      {division && !district && "DIVISION"}
+                      {district && "DISTRICT"}
+                    </th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">DEENI ACTIVITIES</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
                       {formatMonthYearLabel(endMonth || startMonth || "Month")}
