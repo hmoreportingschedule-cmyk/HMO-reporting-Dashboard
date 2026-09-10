@@ -259,7 +259,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       const distKey = row.District.toLowerCase();
       const fldKey = row.Fileds.toLowerCase();
 
-      // Determine active month for Achievement table column
       const targetMonth = endMonth || startMonth || row.NormalizedMonth || "";
 
       let currentReportVal = row.NumericReport || 0;
@@ -625,7 +624,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   <h2 className="text-sm font-bold text-teal-800 uppercase tracking-widest">
                     {activeViewMode === "average" ? "Average & Range Comparison Matrix" : activeViewMode === "targets" ? "Targets & Achievement Matrix" : `Detailed Telemetry Output (${activeTab})`}
                   </h2>
-                  <p className="text-[10px] text-slate-600 mt-1 uppercase tracking-widest">Source: {rawData.length} &bull; Visible: {processedTableData.length}</p>
+                  <p className="text-[10px] font-bold text-teal-800 mt-1 uppercase tracking-widest">Source: {rawData.length} &bull; Visible: {processedTableData.length}</p>
                 </div>
               </div>
 
@@ -633,16 +632,28 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 <table className="min-w-full text-left text-[11px] lg:text-xs">
                   <thead className="bg-[#008b8b]">
                     <tr>
-                      <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">Region</th>
-                      <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">State</th>
-                      <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">Division</th>
-                      <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">District</th>
-                      <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">Deeni Activities</th>
-                      <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle text-right">Report</th>
+                      <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">
+                        {!region && !state && !division && !district && "COUNTRY"}
+                        {region && !state && !division && !district && "REGION"}
+                        {state && !division && !district && "STATE"}
+                        {division && !district && "DIVISION"}
+                        {district && "DISTRICT"}
+                      </th>
+                      <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">DEENI ACTIVITIES</th>
                       <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-r border-white/20 text-center">ACHIEVEMENT</th>
                       <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-white/20 text-center">COMPARISON REPORT</th>
                     </tr>
                     <tr>
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">
+                        {!region && !state && !division && !district && "INDIA"}
+                        {region && !state && !division && !district && region}
+                        {state && !division && !district && state}
+                        {division && !district && division}
+                        {district && district}
+                      </th>
+                      
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">DEENI ACTIVITIES</th>
+                      
                       <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">
                         {formatMonthYearLabel(endMonth || startMonth || "Month")}
                       </th>
@@ -655,37 +666,38 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">
                         {formatMonthYearLabel(endMonth)}
                       </th>
-                      
                       <th className="px-2 py-2 font-bold text-white uppercase tracking-wider text-center bg-[#007a7a]">COMPARISON (%)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {pagedRows.length > 0 ? pagedRows.map((row, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row?.["Region"] || "-"}</td>
-                        <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row?.["State"] || "-"}</td>
-                        <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row?.["Division"] || "-"}</td>
-                        <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row?.["District"] || "-"}</td>
-                        
-                        <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100">{row?.["Fileds"] || row?.["Fields"] || row?.["Deeni Activities"] || "-"}</td>
-                        
-                        <td className="px-2 py-2 text-right font-extrabold text-teal-700 text-sm bg-teal-50/40 border-r border-slate-100">{(row?.["Report Value"] || row?.report || "0")}</td>
-                        
-                        {/* Dynamic Report Value instead of static January */}
-                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row?.DynamicReportValue ?? 0}</td>
-                        <td className="px-2 py-2 text-slate-600 text-right border-r border-slate-100">{row?.DynamicTarget ?? "-"}</td>
-                        <td className="px-2 py-2 text-blue-600 font-bold text-right border-r border-slate-100">{row?.DynamicAchievement ?? "-"}</td>
-                        
-                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row?.Val1 ?? 0}</td>
-                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row?.Val2 ?? 0}</td>
-                        
-                        <td className={`px-2 py-2 font-bold text-center ${String(row?.CalculatedComparison || "").startsWith("+") ? "text-emerald-600" : "text-red-600"}`}>
-                          {row?.CalculatedComparison || "0.0%"}
-                        </td>
-                      </tr>
-                    )) : (
+                    {pagedRows.length > 0 ? pagedRows.map((row, idx) => {
+                      let leftColVal = "India";
+                      if (district) leftColVal = row?.["District"] || "-";
+                      else if (division) leftColVal = row?.["District"] || "-";
+                      else if (state) leftColVal = row?.["Division"] || "-";
+                      else if (region) leftColVal = row?.["State"] || "-";
+
+                      return (
+                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-2 py-2 font-bold text-teal-800 leading-tight border-r border-slate-100">{leftColVal}</td>
+                          
+                          <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100">{row?.["Fileds"] || row?.["Fields"] || row?.["Deeni Activities"] || "-"}</td>
+                          
+                          <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row?.DynamicReportValue ?? 0}</td>
+                          <td className="px-2 py-2 text-slate-600 text-right border-r border-slate-100">{row?.DynamicTarget ?? "-"}</td>
+                          <td className="px-2 py-2 text-blue-600 font-bold text-right border-r border-slate-100">{row?.DynamicAchievement ?? "-"}</td>
+                          
+                          <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row?.Val1 ?? 0}</td>
+                          <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row?.Val2 ?? 0}</td>
+                          
+                          <td className={`px-2 py-2 font-bold text-center ${String(row?.CalculatedComparison || "").startsWith("+") ? "text-emerald-600" : "text-red-600"}`}>
+                            {row?.CalculatedComparison || "0.0%"}
+                          </td>
+                        </tr>
+                      );
+                    }) : (
                       <tr>
-                        <td colSpan="12" className="px-6 py-12 text-center text-slate-500 text-xs uppercase tracking-widest">
+                        <td colSpan="8" className="px-6 py-12 text-center text-slate-500 text-xs uppercase tracking-widest">
                           <div className="flex flex-col items-center justify-center gap-3">
                             <Activity className="w-6 h-6 opacity-40 text-teal-600" />
                             <span>{loading ? "Establishing connection..." : "No matching telemetry found"}</span>
