@@ -12,7 +12,6 @@ const SHEET_URLS = [
   "https://docs.google.com/spreadsheets/d/1yWVgL9IVGrQFElLNeO8X_UGAIDSAGF7P8M31gGtoki8/export?format=csv"
 ];
 
-// MASTER MAPPING DICTIONARY BASED ON YOUR EXCEL TEMPLATE
 const MASTER_CATEGORIES_MAP = [
   { category: "Basic", deeniKaam: "Tanzimi Malumat", field: "Total Active Muballigh" },
   { category: "Basic", deeniKaam: "Tanzimi Malumat", field: "Total Moallimin" },
@@ -169,7 +168,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [division, setDivision] = useState(officeUser?.division && officeUser.division.toLowerCase() !== "all" ? officeUser.division : "");
   const [district, setDistrict] = useState(officeUser?.district && officeUser.district.toLowerCase() !== "all" ? officeUser.district : "");
   
-  // Filters: Category, Deeni Kaam, Fields, Targets
   const [selectedCategory, setSelectedCategory] = useState(""); 
   const [selectedDeeniKaam, setSelectedDeeniKaam] = useState(""); 
   const [selectedField, setSelectedField] = useState(""); 
@@ -247,12 +245,10 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
   };
 
-  // 1. Dynamic Categories from Master Map
   const availableCategories = useMemo(() => {
     return [...new Set(MASTER_CATEGORIES_MAP.map(m => m.category))].sort();
   }, []);
 
-  // 2. Dynamic Deeni Kaam filtered by Selected Category
   const availableDeeniKaam = useMemo(() => {
     let subset = MASTER_CATEGORIES_MAP;
     if (selectedCategory) {
@@ -261,7 +257,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return [...new Set(subset.map(m => m.deeniKaam))].sort();
   }, [selectedCategory]);
 
-  // 3. Dynamic Fields filtered by Selected Deeni Kaam
   const availableFields = useMemo(() => {
     let subset = MASTER_CATEGORIES_MAP;
     if (selectedDeeniKaam) {
@@ -269,6 +264,15 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     }
     return [...new Set(subset.map(m => m.field))].sort();
   }, [selectedDeeniKaam]);
+
+  // Dynamic Left Column Header and Row Label based on hierarchy
+  const leftHeaderTitle = useMemo(() => {
+    if (district) return "";
+    if (division) return "DISTRICT";
+    if (state) return "DIVISION";
+    if (region) return "STATE";
+    return "COUNTRY";
+  }, [region, state, division, district]);
 
   const processedTableData = useMemo(() => {
     if (!Array.isArray(rawData)) return [];
@@ -301,6 +305,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       return "India";
     };
 
+    // Strict Month-wise Aggregation Engine
     const getAggregatedValForMonth = (targetMo, groupKeyFilter, subFilterName, isTargetOrAch = false) => {
       let totalRep = 0;
       let totalTarget = 0;
@@ -308,6 +313,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       baseFiltered.forEach(r => {
         if (!r) return;
         const mo = r.NormalizedMonth || "";
+        // Strict month match: if targetMo is specified, row month must equal targetMo
         if (targetMo && mo !== targetMo) return;
         
         const fld = String(r["Fileds"] || "").trim();
@@ -343,6 +349,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       const compositeKey = `${leftVal}|${dkName}|${fld}`;
 
       if (!aggregatedMap[compositeKey]) {
+        // Default target month: if startMonth or endMonth is selected, use it. Otherwise use row's month or latest available.
         const targetMo = endMonth || startMonth || row.NormalizedMonth || "";
         
         const curRep = getAggregatedValForMonth(targetMo, fld, leftVal);
@@ -684,10 +691,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   <tr>
                     {!district && (
                       <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">
-                        {!region && !state && !division && "COUNTRY"}
-                        {region && !state && !division && "REGION"}
-                        {state && !division && "STATE"}
-                        {division && "DIVISION"}
+                        {leftHeaderTitle}
                       </th>
                     )}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">DEENI KAAM</th>
