@@ -162,10 +162,14 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [activeViewMode, setActiveViewMode] = useState("table"); 
   const [activeTab, setActiveTab] = useState("Monthly Report");
   
-  // Two Month Selectors for the middle columns
+  // Independent Column Month Selectors
+  const [colMonthMain, setColMonthMain] = useState("2026-07"); 
   const [colMonth1, setColMonth1] = useState("2026-06"); 
   const [colMonth2, setColMonth2] = useState("2026-07"); 
   
+  // Header Targets Selector (Standard, 26%, 52%)
+  const [headerTargetMode, setHeaderTargetMode] = useState("");
+
   const [region, setRegion] = useState(officeUser?.region && officeUser.region.toLowerCase() !== "all" ? officeUser.region : "");
   const [state, setState] = useState(officeUser?.state && officeUser.state.toLowerCase() !== "all" ? officeUser.state : "");
   const [division, setDivision] = useState(officeUser?.division && officeUser.division.toLowerCase() !== "all" ? officeUser.division : "");
@@ -174,7 +178,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [selectedCategory, setSelectedCategory] = useState(""); 
   const [selectedDeeniKaam, setSelectedDeeniKaam] = useState(""); 
   const [selectedField, setSelectedField] = useState(""); 
-  const [selectedTargetPct, setSelectedTargetPct] = useState(""); 
   
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -225,8 +228,14 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         
         const months = [...new Set(processed.map(r => r.NormalizedMonth).filter(Boolean))].sort();
         if (months.length > 0) {
-          if (!months.includes(colMonth2)) setColMonth2(months[months.length - 1]);
-          if (months.length > 1 && !months.includes(colMonth1)) setColMonth1(months[months.length - 2]);
+          const latest = months[months.length - 1];
+          setColMonthMain(latest);
+          setColMonth2(latest);
+          if (months.length > 1) {
+            setColMonth1(months[months.length - 2]);
+          } else {
+            setColMonth1(latest);
+          }
         }
       } else {
         setFetchError("Data stream empty.");
@@ -287,7 +296,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return "COUNTRY";
   }, [region, state, division, district]);
 
-  // Accurate SUM Aggregation Engine for India > Region > State > Division hierarchy per Field for colMonth1 and colMonth2
+  // Accurate SUM Aggregation Engine for India > Region > State > Division hierarchy per Field
   const processedTableData = useMemo(() => {
     if (!Array.isArray(rawData) || rawData.length === 0) return [];
 
@@ -348,8 +357,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       Object.keys(validFieldsMap).forEach(fldName => {
         const meta = validFieldsMap[fldName];
 
-        let sumVal1 = 0; // for colMonth1
-        let sumVal2 = 0; // for colMonth2
+        let sumMain = 0; // for colMonthMain
+        let sumVal1 = 0; // for comparison colMonth1
+        let sumVal2 = 0; // for comparison colMonth2
         let sumTarget = 0;
 
         filteredRows.forEach(r => {
@@ -363,20 +373,24 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
           const repVal = r.NumericReport || 0;
           const targetVal = r.Target || 0;
 
+          if (colMonthMain && mo === colMonthMain) {
+            sumMain += repVal;
+            let baseT = targetVal;
+            if (headerTargetMode === "26%") baseT = baseT * 0.26;
+            else if (headerTargetMode === "52%") baseT = baseT * 0.52;
+            sumTarget += baseT;
+          }
+
           if (colMonth1 && mo === colMonth1) {
             sumVal1 += repVal;
           }
 
           if (colMonth2 && mo === colMonth2) {
             sumVal2 += repVal;
-            let baseT = targetVal;
-            if (selectedTargetPct === "26%") baseT = baseT * 0.26;
-            else if (selectedTargetPct === "52%") baseT = baseT * 0.52;
-            sumTarget += baseT;
           }
         });
 
-        if (sumVal1 > 0 || sumVal2 > 0 || (!selectedCategory && !selectedDeeniKaam && !selectedField)) {
+        if (sumMain > 0 || sumVal1 > 0 || sumVal2 > 0 || (!selectedCategory && !selectedDeeniKaam && !selectedField)) {
           let v1 = sumVal1;
           let v2 = sumVal2;
 
@@ -399,27 +413,28 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
 
           let compStr = `${diffPercent >= 0 ? "+" : ""}${diffPercent.toFixed(1)}%`;
           let targetRounded = Math.round(sumTarget);
-          let achPct = targetRounded > 0 ? ((sumVal2 / targetRounded) * 100).toFixed(1) + "%" : "-";
+          let achPct = targetRounded > 0 ? ((sumMain / targetRounded) * 100).toFixed(1) + "%" : "-";
 
           resultList.push({
             LeftColValue: subEntity,
             DeeniKaamName: meta.deeniKaam,
             DeeniActivity: fldName,
-            DynamicReportValue: sumVal2,
+            DynamicReportValue: sumMain,
             DynamicTarget: targetRounded,
             DynamicAchievement: achPct,
             Val1: v1,
             Val2: v2,
             CalculatedComparison: compStr,
             ColMonth1Label: formatMonthYearLabel(colMonth1),
-            ColMonth2Label: formatMonthYearLabel(colMonth2)
+            ColMonth2Label: formatMonthYearLabel(colMonth2),
+            MainMonthLabel: formatMonthYearLabel(colMonthMain)
           });
         }
       });
     });
 
     return resultList;
-  }, [rawData, region, state, division, district, selectedCategory, selectedDeeniKaam, selectedField, selectedTargetPct, searchTerm, colMonth1, colMonth2, activeTab, activeViewMode]);
+  }, [rawData, region, state, division, district, selectedCategory, selectedDeeniKaam, selectedField, headerTargetMode, searchTerm, colMonthMain, colMonth1, colMonth2, activeTab, activeViewMode]);
 
   const pagedRows = useMemo(() => {
     if (!Array.isArray(processedTableData)) return [];
@@ -629,13 +644,13 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     </select>
                   </div>
 
-                  {/* Targets Filter (26% / 52%) */}
+                  {/* Targets Filter (Standard / 26% / 52%) */}
                   <div className="flex flex-col flex-1 min-w-[90px]">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Targets</label>
-                    <select value={selectedTargetPct} onChange={(e) => setSelectedTargetPct(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
+                    <select value={headerTargetMode} onChange={(e) => setHeaderTargetMode(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
                       <option value="">Standard</option>
-                      <option value="26%">26%</option>
-                      <option value="52%">52%</option>
+                      <option value="26%">Target 26%</option>
+                      <option value="52%">Target 52%</option>
                     </select>
                   </div>
 
@@ -711,11 +726,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">DEENI KAAM</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">FIELDS</th>
                     
-                    {/* Achievement column (using colMonth2) */}
+                    {/* Main Report Column with Independent Month Selector */}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
                       <select 
-                        value={colMonth2} 
-                        onChange={(e) => setColMonth2(e.target.value)} 
+                        value={colMonthMain} 
+                        onChange={(e) => setColMonthMain(e.target.value)} 
                         className="bg-[#006666] text-white text-xs font-bold py-1 px-2 rounded border border-teal-500 outline-none cursor-pointer"
                       >
                         {availableMonths.map(m => (
@@ -724,10 +739,25 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       </select>
                     </th>
 
-                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">TARGETS</th>
+                    {/* Targets Column with Header Dropdown */}
+                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
+                      <div className="flex items-center justify-center gap-1">
+                        <span>TARGETS</span>
+                        <select 
+                          value={headerTargetMode} 
+                          onChange={(e) => setHeaderTargetMode(e.target.value)}
+                          className="bg-[#006666] text-white text-[10px] font-bold py-0.5 px-1 rounded border border-teal-500 outline-none cursor-pointer"
+                        >
+                          <option value="" className="bg-white text-slate-800">Std</option>
+                          <option value="26%" className="bg-white text-slate-800">26%</option>
+                          <option value="52%" className="bg-white text-slate-800">52%</option>
+                        </select>
+                      </div>
+                    </th>
+
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">ACHIEVEMENT (%)</th>
                     
-                    {/* Comparison Month 1 Selector */}
+                    {/* Comparison Column 1 Month Selector */}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
                       <select 
                         value={colMonth1} 
@@ -740,7 +770,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       </select>
                     </th>
 
-                    {/* Comparison Month 2 Selector */}
+                    {/* Comparison Column 2 Month Selector */}
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
                       <select 
                         value={colMonth2} 
