@@ -12,6 +12,22 @@ const SHEET_URLS = [
   "https://docs.google.com/spreadsheets/d/1yWVgL9IVGrQFElLNeO8X_UGAIDSAGF7P8M31gGtoki8/export?format=csv"
 ];
 
+// Fallback mapping in case Google Sheet is missing 'Deeni Kaam' column
+const FIELD_TO_DEENIKAAM_MAP = {
+  "Total Active Muballigh": "Tanzimi Malumat",
+  "Total Moallimin": "Tanzimi Malumat",
+  "Total Masjid": "Tanzimi Malumat",
+  "Apni Masjid": "Tanzimi Malumat",
+  "Total Zeili Halqe": "Tanzimi Malumat",
+  "Total Zaili Halqe Taqarrur": "Tanzimi Malumat",
+  "Fajr Ke Liye Jagaen": "Fajr Ke Liye Jagaen",
+  "Tafseer Sunna/Sunnana": "Tafseer Sunna/Sunnana",
+  "Masjid Dars": "Dars",
+  "Area Dars": "Dars",
+  "Ghar Dars": "Dars",
+  "Total Dars": "Dars"
+};
+
 const parseSheet = (url) => {
   return new Promise((resolve) => {
     Papa.parse(url, {
@@ -153,8 +169,12 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
           if (!row) return null;
           let reportVal = Number(String(row["Report Value"] || row.report || "0").replace(/,/g, ""));
           let targetVal = Number(String(row["Target"] || "0").replace(/,/g, ""));
+          let fld = String(row["Fileds"] || row["Fields"] || row["Deeni Activities"] || "").trim();
+          let dk = String(row["Deeni Kaam"] || row["Category"] || FIELD_TO_DEENIKAAM_MAP[fld] || "Other").trim();
           return {
             ...row,
+            "Deeni Kaam": dk,
+            "Fileds": fld,
             Target: isNaN(targetVal) ? 0 : targetVal,
             Achievement: Number(String(row["Achievement"] || row["Achivement"] || "0").replace(/,/g, "")),
             NormalizedMonth: parseRowMonth(row),
@@ -188,7 +208,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
   };
 
-  // Dynamic Deeni Kaam list from Column B or equivalent property
+  // Dynamic Deeni Kaam list
   const availableDeeniKaam = useMemo(() => {
     return uniqValues(rawData, "Deeni Kaam");
   }, [rawData]);
@@ -212,10 +232,10 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       const matchDivision = !division || sameClient(row["Division"], division);
       const matchDistrict = !district || sameClient(row["District"], district);
       
-      const deeniKaamVal = row["Deeni Kaam"] || row["Category"] || "";
+      const deeniKaamVal = row["Deeni Kaam"] || "";
       const matchDeeniKaam = !selectedDeeniKaam || sameClient(deeniKaamVal, selectedDeeniKaam);
 
-      const fieldVal = row["Fileds"] || row["Fields"] || row["Deeni Activities"] || "";
+      const fieldVal = row["Fileds"] || "";
       const matchField = !selectedField || sameClient(fieldVal, selectedField);
 
       const matchSearch = !searchTerm || JSON.stringify(row).toLowerCase().includes(searchTerm.toLowerCase().trim());
@@ -239,7 +259,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         const mo = r.NormalizedMonth || "";
         if (targetMo && mo !== targetMo) return;
         
-        const fld = String(r["Fileds"] || r["Fields"] || r["Deeni Activities"] || "").trim();
+        const fld = String(r["Fileds"] || "").trim();
         let matchesGroup = false;
 
         if (district) matchesGroup = fld === groupKeyFilter;
@@ -266,9 +286,10 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     const aggregatedMap = {};
     baseFiltered.forEach(row => {
       if (!row) return;
-      const fld = String(row["Fileds"] || row["Fields"] || row["Deeni Activities"] || "").trim();
+      const fld = String(row["Fileds"] || "").trim();
+      const dkName = String(row["Deeni Kaam"] || "").trim();
       const leftVal = getLeftColName(row);
-      const compositeKey = `${leftVal}|${fld}`;
+      const compositeKey = `${leftVal}|${dkName}|${fld}`;
 
       if (!aggregatedMap[compositeKey]) {
         const targetMo = endMonth || startMonth || row.NormalizedMonth || "";
@@ -300,6 +321,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
 
         aggregatedMap[compositeKey] = {
           LeftColValue: leftVal,
+          DeeniKaamName: dkName,
           DeeniActivity: fld,
           DynamicMonthDisplay: formatMonthYearLabel(targetMo),
           DynamicReportValue: curRep,
@@ -608,7 +630,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                         {division && "DIVISION"}
                       </th>
                     )}
-                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">DEENI ACTIVITIES</th>
+                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">DEENI KAAM</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">FIELDS</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
                       {formatMonthYearLabel(endMonth || startMonth || "Month")}
@@ -631,7 +653,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                         <td className="px-2 py-2 font-bold text-teal-800 leading-tight border-r border-slate-100 text-center">{row?.LeftColValue || "-"}</td>
                       )}
                       
-                      <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100 text-center">{row?.DeeniKaamName || row?.DeeniActivity || "-"}</td>
+                      <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100 text-center">{row?.DeeniKaamName || "-"}</td>
                       <td className="px-2 py-2 font-bold text-slate-700 leading-tight border-r border-slate-100 text-center">{row?.DeeniActivity || "-"}</td>
                       
                       <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row?.DynamicReportValue ?? 0}</td>
