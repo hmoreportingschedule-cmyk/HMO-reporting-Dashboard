@@ -44,7 +44,7 @@ const uniqValues = (data = [], key) => {
 };
 
 const formatMonthYearLabel = (val) => {
-  if (!val) return "Month With Year";
+  if (!val) return "Month";
   const parts = val.split("-");
   if (parts.length < 2) return val;
   const [year, month] = parts;
@@ -193,7 +193,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return uniqValues(subset, "Fileds");
   }, [rawData, selectedCategory]);
 
-  // Ultra-Fast Fast Lookup Map Builder for O(1) matching instead of O(N) .find()
   const lookupMap = useMemo(() => {
     const map = {};
     if (Array.isArray(rawData)) {
@@ -206,7 +205,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         const fld = String(r["Fileds"] || r["Fields"] || r["Deeni Activities"] || "").trim().toLowerCase();
         const mo = String(r.NormalizedMonth || "").trim();
         const key = `${reg}|${st}|${div}|${dist}|${fld}|${mo}`;
-        map[key] = r.NumericReport || 0;
+        map[key] = {
+          report: r.NumericReport || 0,
+          target: r.Target || 0,
+          achievement: r.Achievement || 0
+        };
       });
     }
     return map;
@@ -256,10 +259,26 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       const distKey = row.District.toLowerCase();
       const fldKey = row.Fileds.toLowerCase();
 
+      // Determine active month for Achievement table column
+      const targetMonth = endMonth || startMonth || row.NormalizedMonth || "";
+
+      let currentReportVal = row.NumericReport || 0;
+      let currentTargetVal = row.Target || 0;
+      let currentAch = row.Achievement || 0;
+
+      if (targetMonth) {
+        const kTarget = `${regKey}|${stKey}|${divKey}|${distKey}|${fldKey}|${targetMonth}`;
+        if (lookupMap[kTarget]) {
+          currentReportVal = lookupMap[kTarget].report;
+          currentTargetVal = lookupMap[kTarget].target;
+          currentAch = lookupMap[kTarget].achievement;
+        }
+      }
+
       let v1 = 0;
       if (startMonth) {
         const k1 = `${regKey}|${stKey}|${divKey}|${distKey}|${fldKey}|${startMonth}`;
-        v1 = lookupMap[k1] || 0;
+        v1 = lookupMap[k1]?.report || 0;
       } else {
         v1 = row.NumericReport || 0;
       }
@@ -267,7 +286,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       let v2 = 0;
       if (endMonth) {
         const k2 = `${regKey}|${stKey}|${divKey}|${distKey}|${fldKey}|${endMonth}`;
-        v2 = lookupMap[k2] || 0;
+        v2 = lookupMap[k2]?.report || 0;
       } else {
         v2 = row.NumericReport || 0;
       }
@@ -293,6 +312,10 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
 
       return {
         ...row,
+        DynamicMonthDisplay: formatMonthYearLabel(targetMonth),
+        DynamicReportValue: currentReportVal,
+        DynamicTarget: currentTargetVal,
+        DynamicAchievement: currentAch || (currentTargetVal > 0 ? ((currentReportVal / currentTargetVal) * 100).toFixed(1) + "%" : "-"),
         Val1: v1,
         Val2: v2,
         CalculatedComparison: compStr
@@ -616,13 +639,15 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">District</th>
                       <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle">Deeni Activities</th>
                       <th rowSpan="2" className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/20 align-middle text-right">Report</th>
-                      <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-r border-white/20 text-center">Achievement</th>
+                      <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-r border-white/20 text-center">ACHIEVEMENT</th>
                       <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-white/20 text-center">COMPARISON REPORT</th>
                     </tr>
                     <tr>
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">Month</th>
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-right bg-[#007a7a]">Targets</th>
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-right bg-[#007a7a]">Achievement (%)</th>
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">
+                        {formatMonthYearLabel(endMonth || startMonth || "Month")}
+                      </th>
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-right bg-[#007a7a]">TARGETS</th>
+                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-right bg-[#007a7a]">ACHIEVEMENT (%)</th>
                       
                       <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/20 text-center bg-[#007a7a]">
                         {formatMonthYearLabel(startMonth)}
@@ -646,10 +671,10 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                         
                         <td className="px-2 py-2 text-right font-extrabold text-teal-700 text-sm bg-teal-50/40 border-r border-slate-100">{(row?.["Report Value"] || row?.report || "0")}</td>
                         
-                        <td className="px-2 py-2 text-slate-600 text-center border-r border-slate-100">{row?.["Month"] || "-"}</td>
-                        
-                        <td className="px-2 py-2 text-slate-600 text-right border-r border-slate-100">{row?.["Target"] || "-"}</td>
-                        <td className="px-2 py-2 text-blue-600 font-bold text-right border-r border-slate-100">{row?.["Achievement %"] || row?.["Achievement"] || "-"}</td>
+                        {/* Dynamic Report Value instead of static January */}
+                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row?.DynamicReportValue ?? 0}</td>
+                        <td className="px-2 py-2 text-slate-600 text-right border-r border-slate-100">{row?.DynamicTarget ?? "-"}</td>
+                        <td className="px-2 py-2 text-blue-600 font-bold text-right border-r border-slate-100">{row?.DynamicAchievement ?? "-"}</td>
                         
                         <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row?.Val1 ?? 0}</td>
                         <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row?.Val2 ?? 0}</td>
