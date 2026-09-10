@@ -6,10 +6,20 @@ import * as XLSX from "xlsx";
 import pptxgen from "pptxgenjs";
 import html2canvas from "html2canvas";
 
-const SHEET_URLS = [
-  "https://docs.google.com/spreadsheets/d/1P1Ul-jXOfFfhuQLTKeQ-zOynKnCmywH-_gjZ9nJ8tO0/export?format=csv",
-  "https://docs.google.com/spreadsheets/d/1S2tEIyaN8p-yu4Vd_GVumqBqwzgTzM3zlms4DwCJr00/export?format=csv",
-  "https://docs.google.com/spreadsheets/d/1yWVgL9IVGrQFElLNeO8X_UGAIDSAGF7P8M31gGtoki8/export?format=csv"
+// OneDrive / SharePoint Direct CSV Link mapping
+const getDirectOneDriveUrl = (url) => {
+  if (!url) return "";
+  if (url.includes("sharepoint.com") || url.includes("1drv.ms")) {
+    // Convert SharePoint view link to download link if needed
+    if (!url.includes("download=1")) {
+      return url.includes("?") ? `${url}&download=1` : `${url}?download=1`;
+    }
+  }
+  return url;
+};
+
+const ONEDRIVE_SHEET_URLS = [
+  getDirectOneDriveUrl("https://dawateislamihindnet-my.sharepoint.com/:x:/g/personal/officehind_dawateislamiindia_org/IQAOT3wd7ly4RYf54jRLNz3PAWGoX1nmQr6UYYveHeeKim0?e=HRstwW")
 ];
 
 const parseSheet = (url) => {
@@ -143,7 +153,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     setLoading(true);
     setFetchError("");
     try {
-      const resultsArray = await Promise.all(SHEET_URLS.map(url => parseSheet(url)));
+      const resultsArray = await Promise.all(ONEDRIVE_SHEET_URLS.map(url => parseSheet(url)));
       const combinedData = resultsArray.flat().filter(Boolean);
       if (combinedData.length > 0) {
         const processed = combinedData.map(row => {
@@ -160,11 +170,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         }).filter(Boolean);
         setRawData(processed);
       } else {
-        setFetchError("Data stream empty or connection lost.");
+        setFetchError("Data stream empty or OneDrive connection blocked by CORS.");
       }
       setLoading(false);
     } catch (err) {
-      setFetchError("Network latency issue.");
+      setFetchError("Network or OneDrive synchronization issue.");
       setLoading(false);
     }
   };
