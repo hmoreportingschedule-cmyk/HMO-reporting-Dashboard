@@ -162,7 +162,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [activeViewMode, setActiveViewMode] = useState("table"); 
   const [activeTab, setActiveTab] = useState("Monthly Report");
   
-  // Table Header Inline Month Selector state (Default to 2026-07 or first available)
   const [tableSelectedMonth, setTableSelectedMonth] = useState("2026-07"); 
   
   const [region, setRegion] = useState(officeUser?.region && officeUser.region.toLowerCase() !== "all" ? officeUser.region : "");
@@ -222,7 +221,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         }).filter(Boolean);
         setRawData(processed);
         
-        // Set default table month to the latest available if default doesn't exist
         const months = [...new Set(processed.map(r => r.NormalizedMonth).filter(Boolean))].sort();
         if (months.length > 0 && !months.includes("2026-07")) {
           setTableSelectedMonth(months[months.length - 1]);
@@ -286,13 +284,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return "COUNTRY";
   }, [region, state, division, district]);
 
-  // Accurate SUM Aggregation Engine for India > Region > State > Division hierarchy per Field and Month
   const processedTableData = useMemo(() => {
     if (!Array.isArray(rawData) || rawData.length === 0) return [];
 
     const activeMonth = tableSelectedMonth;
 
-    // Helper to get previous month for comparison
     const getPreviousMonth = (moStr) => {
       if (!moStr || !/^\d{4}-\d{2}$/.test(moStr)) return "";
       const [yr, mo] = moStr.split("-").map(Number);
@@ -301,12 +297,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     };
     const prevMonth = getPreviousMonth(activeMonth);
 
-    // Determine grouping sub-key and left column value based on active filters
-    // If no region/state/division/district -> Left column is "India", group by Field across all India.
-    // If Region selected -> Left column shows "State" names, group by State + Field.
-    // If State selected -> Left column shows "Division" names, group by Division + Field.
-    // If Division selected -> Left column shows "District" names, group by District + Field.
-    // If District selected -> Left column is hidden, group by Field for that District.
     const getLeftColName = (r) => {
       if (district) return "";
       if (division) return r["District"] || "-";
@@ -315,15 +305,23 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       return "India";
     };
 
-    const getGroupSubKey = (r) => {
-      if (district) return r["District"] || "-";
-      if (division) return r["District"] || "-";
-      if (state) return r["Division"] || "-";
-      if (region) return r["State"] || "-";
-      return "India";
-    };
+    const validFieldsMap = {};
+    MASTER_CATEGORIES_MAP.forEach(m => {
+      if (selectedCategory && !sameClient(m.category, selectedCategory)) return;
+      if (selectedDeeniKaam && !sameClient(m.deeniKaam, selectedDeeniKaam)) return;
+      if (selectedField && !sameClient(m.field, selectedField)) return;
+      validFieldsMap[m.field] = { category: m.category, deeniKaam: m.deeniKaam };
+    });
 
-    // Filter rawData by UI dropdown filters (Category, Deeni Kaam, Field, Search, Geographic filters)
+    rawData.forEach(r => {
+      const fld = r["Fileds"];
+      if (fld && !validFieldsMap[fld]) {
+        if (!selectedField || sameClient(fld, selectedField)) {
+          validFieldsMap[fld] = { category: r["Category"], deeniKaam: r["Deeni Kaam"] };
+        }
+      }
+    });
+
     const filteredRows = rawData.filter((row) => {
       if (!row) return false;
       const matchRegion = !region || sameClient(row["Region"], region);
@@ -344,30 +342,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       return matchRegion && matchState && matchDivision && matchDistrict && matchCat && matchDeeniKaam && matchField && matchSearch;
     });
 
-    // Collect all unique fields that match current category/deeni kaam filters
-    const validFieldsMap = {};
-    MASTER_CATEGORIES_MAP.forEach(m => {
-      if (selectedCategory && !sameClient(m.category, selectedCategory)) return;
-      if (selectedDeeniKaam && !sameClient(m.deeniKaam, selectedDeeniKaam)) return;
-      if (selectedField && !sameClient(m.field, selectedField)) return;
-      validFieldsMap[m.field] = { category: m.category, deeniKaam: m.deeniKaam };
-    });
-
-    // Also include any fields from filteredRows that match
-    filteredRows.forEach(r => {
-      const fld = r["Fileds"];
-      if (fld && !validFieldsMap[fld]) {
-        if (!selectedField || sameClient(fld, selectedField)) {
-          validFieldsMap[fld] = { category: r["Category"], deeniKaam: r["Deeni Kaam"] };
-        }
-      }
-    });
-
-    // Determine distinct sub-entities (left column values) to display
-    // If Region is selected, we want all States inside that Region.
-    // If State is selected, all Divisions inside that State.
-    // If Division is selected, all Districts inside that Division.
-    // If nothing selected, just ["India"].
     const subEntitiesSet = new Set();
     filteredRows.forEach(r => {
       subEntitiesSet.add(getLeftColName(r));
@@ -376,12 +350,10 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
 
     const resultList = [];
 
-    // For each sub-entity and each valid field, SUM the reports for activeMonth and prevMonth
     subEntities.forEach(subEntity => {
       Object.keys(validFieldsMap).forEach(fldName => {
         const meta = validFieldsMap[fldName];
 
-        // Sum for activeMonth
         let sumActive = 0;
         let sumTarget = 0;
         let sumPrev = 0;
@@ -410,8 +382,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
           }
         });
 
-        // Only include if there is data or if it's explicitly matched
-        if (sumActive > 0 || sumPrev > 0 || !selectedMonth) {
+        if (sumActive > 0 || sumPrev > 0 || (!selectedCategory && !selectedDeeniKaam && !selectedField)) {
           let v1 = sumPrev;
           let v2 = sumActive;
 
@@ -628,7 +599,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-9 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-8 gap-3">
                   <div className="col-span-2 md:col-span-1" data-html2canvas-ignore="true">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Search</label>
                     <div className="relative">
@@ -680,7 +651,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     { label: "Division", val: division, set: handleSetDivision, opts: uniqValues(rawData.filter(x=>(!region||sameClient(x["Region"],region))&&(!state||sameClient(x["State"],state))), "Division") },
                     { label: "District", val: district, set: setDistrict, opts: uniqValues(rawData.filter(x=>(!region||sameClient(x["Region"],region))&&(!state||sameClient(x["State"],state))&&(!division||sameClient(x["Division"],division))), "District") }
                   ].map((f, i) => (
-                    <div key={i} className="flex flex-col flex-1 min-w-[120px]">
+                    <div key={i} className="flex flex-col flex-1 min-w-[110px]">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{f.label}</label>
                       <select value={f.val} onChange={(e) => f.set(e.target.value)} disabled={officeUser?.[f.label.toLowerCase()] && officeUser[f.label.toLowerCase()].toLowerCase() !== "all"} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer disabled:bg-slate-50 disabled:text-slate-400">
                         <option value="">{f.val || "All"}</option>
