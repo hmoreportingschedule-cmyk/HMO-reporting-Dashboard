@@ -93,11 +93,12 @@ const uniqValues = (data = [], key) => {
 
 const formatMonthYearLabel = (val) => {
   if (!val) return "Month";
-  const parts = val.split("-");
-  if (parts.length < 2) return val;
-  const [year, month] = parts;
-  const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
-  return isNaN(date.getTime()) ? val : date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+  if (/^\d{4}-\d{2}$/.test(val)) {
+    const [year, month] = val.split("-");
+    const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
+    return isNaN(date.getTime()) ? val : date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+  }
+  return val;
 };
 
 const parseRowMonth = (row) => {
@@ -160,8 +161,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
 
   const [activeViewMode, setActiveViewMode] = useState("table"); 
   const [activeTab, setActiveTab] = useState("Monthly Report");
-  const [startMonth, setStartMonth] = useState("");
-  const [endMonth, setEndMonth] = useState("");
+  
+  // Selected Month Dropdown state
+  const [selectedMonth, setSelectedMonth] = useState("2026-07"); 
   
   const [region, setRegion] = useState(officeUser?.region && officeUser.region.toLowerCase() !== "all" ? officeUser.region : "");
   const [state, setState] = useState(officeUser?.state && officeUser.state.toLowerCase() !== "all" ? officeUser.state : "");
@@ -265,6 +267,12 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return [...new Set(subset.map(m => m.field))].sort();
   }, [selectedDeeniKaam]);
 
+  // Available months from rawData for dropdown
+  const availableMonths = useMemo(() => {
+    const months = [...new Set(rawData.map(r => r.NormalizedMonth).filter(Boolean))];
+    return months.sort().reverse();
+  }, [rawData]);
+
   const leftHeaderTitle = useMemo(() => {
     if (district) return "";
     if (division) return "DISTRICT";
@@ -276,8 +284,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const processedTableData = useMemo(() => {
     if (!Array.isArray(rawData)) return [];
     
-    // Determine target month (default to startMonth or endMonth or latest available in rawData)
-    const activeMonth = endMonth || startMonth || (rawData.length > 0 ? rawData[0].NormalizedMonth : "");
+    const activeMonth = selectedMonth || (rawData.length > 0 ? rawData[0].NormalizedMonth : "");
 
     const baseFiltered = rawData.filter((row) => {
       if (!row) return false;
@@ -295,7 +302,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       const fieldVal = row["Fileds"] || "";
       const matchField = !selectedField || sameClient(fieldVal, selectedField);
 
-      // Strict Month matching for active view
       const matchMonth = !activeMonth || row.NormalizedMonth === activeMonth;
 
       const matchSearch = !searchTerm || JSON.stringify(row).toLowerCase().includes(searchTerm.toLowerCase().trim());
@@ -310,6 +316,16 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       return "India";
     };
 
+    // Calculate previous month for comparison
+    const getPreviousMonth = (moStr) => {
+      if (!moStr || !/^\d{4}-\d{2}$/.test(moStr)) return "";
+      const [yr, mo] = moStr.split("-").map(Number);
+      let d = new Date(yr, mo - 2, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    };
+
+    const prevMonth = getPreviousMonth(activeMonth);
+
     const getAggregatedValForMonth = (targetMo, groupKeyFilter, subFilterName, isTargetOrAch = false) => {
       let totalRep = 0;
       let totalTarget = 0;
@@ -319,7 +335,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         const mo = r.NormalizedMonth || "";
         if (targetMo && mo !== targetMo) return;
 
-        // Apply geographic filters
         if (region && !sameClient(r["Region"], region)) return;
         if (state && !sameClient(r["State"], state)) return;
         if (division && !sameClient(r["Division"], division)) return;
@@ -361,8 +376,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         const curRep = row.NumericReport || 0;
         const targetAchObj = { target: row.Target || 0, report: curRep };
 
-        let v1 = startMonth ? getAggregatedValForMonth(startMonth, fld, leftVal) : curRep;
-        let v2 = endMonth ? getAggregatedValForMonth(endMonth, fld, leftVal) : curRep;
+        let v1 = prevMonth ? getAggregatedValForMonth(prevMonth, fld, leftVal) : curRep;
+        let v2 = curRep;
 
         if (activeTab === "Average Report" || activeViewMode === "average") {
           v1 = Math.round(v1 / 2);
@@ -393,13 +408,14 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
           DynamicAchievement: targetAchObj.target > 0 ? ((curRep / targetAchObj.target) * 100).toFixed(1) + "%" : "-",
           Val1: v1,
           Val2: v2,
-          CalculatedComparison: compStr
+          CalculatedComparison: compStr,
+          PrevMonthLabel: formatMonthYearLabel(prevMonth)
         };
       }
     });
 
     return Object.values(aggregatedMap);
-  }, [rawData, region, state, division, district, selectedCategory, selectedDeeniKaam, selectedField, selectedTargetPct, searchTerm, startMonth, endMonth, activeTab, activeViewMode]);
+  }, [rawData, region, state, division, district, selectedCategory, selectedDeeniKaam, selectedField, selectedTargetPct, searchTerm, selectedMonth, activeTab, activeViewMode]);
 
   const pagedRows = useMemo(() => {
     if (!Array.isArray(processedTableData)) return [];
@@ -569,23 +585,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-5 border-b border-slate-100 pb-4">
                   <div className="flex items-center gap-3">
                     <Filter className="w-5 h-5 text-teal-700" />
-                    <h2 className="text-sm font-bold text-slate-800 tracking-widest uppercase">Global Filters & Range Picker</h2>
-                  </div>
-                  
-                  <div className="flex flex-wrap items-center gap-3" data-html2canvas-ignore="true">
-                     <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200">
-                        <Calendar className="w-4 h-4 text-slate-400 ml-2" />
-                        <input type="month" value={startMonth} onChange={e => setStartMonth(e.target.value)} className="bg-transparent text-xs font-bold text-slate-700 outline-none" />
-                        <span className="text-slate-400 text-xs font-bold">TO</span>
-                        <input type="month" value={endMonth} onChange={e => setEndMonth(e.target.value)} className="bg-transparent text-xs font-bold text-slate-700 outline-none pr-2" />
-                     </div>
-                     {(startMonth || endMonth) && (
-                       <button onClick={() => { setStartMonth(""); setEndMonth(""); }} className="text-xs text-red-500 font-bold underline px-2">Reset</button>
-                     )}
+                    <h2 className="text-sm font-bold text-slate-800 tracking-widest uppercase">Global Filters & Month Picker</h2>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-9 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-10 gap-3">
                   <div className="col-span-2 md:col-span-1" data-html2canvas-ignore="true">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Search</label>
                     <div className="relative">
@@ -594,8 +598,17 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     </div>
                   </div>
 
-                  {/* Category Filter */}
+                  {/* Month & Year Dropdown Filter */}
                   <div className="flex flex-col flex-1 min-w-[120px]">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Month & Year</label>
+                    <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
+                      <option value="">All Months</option>
+                      {availableMonths.map(m => <option key={m} value={m}>{formatMonthYearLabel(m)}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Category Filter */}
+                  <div className="flex flex-col flex-1 min-w-[110px]">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Category</label>
                     <select value={selectedCategory} onChange={(e) => { setSelectedCategory(e.target.value); setSelectedDeeniKaam(""); setSelectedField(""); }} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
                       <option value="">All Categories</option>
@@ -604,7 +617,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   </div>
 
                   {/* Deeni Kaam Filter */}
-                  <div className="flex flex-col flex-1 min-w-[130px]">
+                  <div className="flex flex-col flex-1 min-w-[120px]">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Deeni Kaam</label>
                     <select value={selectedDeeniKaam} onChange={(e) => { setSelectedDeeniKaam(e.target.value); setSelectedField(""); }} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
                       <option value="">All Deeni Kaam</option>
@@ -613,7 +626,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   </div>
 
                   {/* Fields Filter */}
-                  <div className="flex flex-col flex-1 min-w-[130px]">
+                  <div className="flex flex-col flex-1 min-w-[120px]">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Fields</label>
                     <select value={selectedField} onChange={(e) => setSelectedField(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
                       <option value="">All Fields</option>
@@ -637,7 +650,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     { label: "Division", val: division, set: handleSetDivision, opts: uniqValues(rawData.filter(x=>(!region||sameClient(x["Region"],region))&&(!state||sameClient(x["State"],state))), "Division") },
                     { label: "District", val: district, set: setDistrict, opts: uniqValues(rawData.filter(x=>(!region||sameClient(x["Region"],region))&&(!state||sameClient(x["State"],state))&&(!division||sameClient(x["Division"],division))), "District") }
                   ].map((f, i) => (
-                    <div key={i} className="flex flex-col flex-1 min-w-[120px]">
+                    <div key={i} className="flex flex-col flex-1 min-w-[110px]">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{f.label}</label>
                       <select value={f.val} onChange={(e) => f.set(e.target.value)} disabled={officeUser?.[f.label.toLowerCase()] && officeUser[f.label.toLowerCase()].toLowerCase() !== "all"} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer disabled:bg-slate-50 disabled:text-slate-400">
                         <option value="">{f.val || "All"}</option>
@@ -703,15 +716,15 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">DEENI KAAM</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">FIELDS</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
-                      {formatMonthYearLabel(endMonth || startMonth || "Month")}
+                      {formatMonthYearLabel(selectedMonth)}
                     </th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">TARGETS</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">ACHIEVEMENT (%)</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
-                      {formatMonthYearLabel(startMonth)}
+                      {formatMonthYearLabel(pagedRows[0]?.PrevMonthLabel || "Prev Month")}
                     </th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
-                      {formatMonthYearLabel(endMonth)}
+                      {formatMonthYearLabel(selectedMonth)}
                     </th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider text-center bg-[#007a7a]">COMPARISON (%)</th>
                   </tr>
