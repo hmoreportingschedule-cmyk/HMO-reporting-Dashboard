@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useMemo, useTransition } from "react";
 import Papa from "papaparse";
-import { LogOut, RefreshCw, Filter, Search, Activity, ArrowLeft, Download, BookOpenCheck, Image as ImageIcon, Clock, LayoutDashboard, BarChart3, TrendingUp, Target } from "lucide-react";
+import { LogOut, RefreshCw, Filter, Search, Activity, ArrowLeft, Download, BookOpenCheck, Image as ImageIcon, Clock, LayoutDashboard, BarChart3, TrendingUp, Target, PieChart, Layers } from "lucide-react";
 import * as XLSX from "xlsx";
 import pptxgen from "pptxgenjs";
 import html2canvas from "html2canvas";
@@ -74,23 +74,6 @@ const parseSheet = (url) => {
 
 const sameClient = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
-const groupCount = (data = [], key) => {
-  if (!Array.isArray(data)) return [];
-  const map = {};
-  data.forEach(x => {
-      if (!x) return;
-      const k = String(x[key] || "Unknown").trim();
-      const n = Number(String(x["Report Value"] || x.report || "0").replace(/,/g, ""));
-      map[k] = (map[k] || 0) + (isNaN(n) ? 0 : n);
-  });
-  return Object.keys(map).sort((a,b) => map[b] - map[a]).map(k => ({ label: k, count: map[k] }));
-};
-
-const uniqValues = (data = [], key) => {
-  if (!Array.isArray(data)) return [];
-  return [...new Set(data.map(x => String(x?.[key] || "").trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b));
-};
-
 const formatMonthYearLabel = (val) => {
   if (!val) return "Month";
   if (/^\d{4}-\d{2}$/.test(val)) {
@@ -136,8 +119,8 @@ const parseRowMonth = (row) => {
 
 const MiniTable = ({ title, data = [] }) => (
   <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[340px]">
-    <div className="p-4 border-b border-slate-100">
-      <h3 className="text-teal-700 font-bold uppercase tracking-widest text-xs">{title}</h3>
+    <div className="p-4 border-b border-slate-100 bg-teal-50">
+      <h3 className="text-teal-800 font-bold uppercase tracking-widest text-xs">{title}</h3>
     </div>
     <div className="overflow-y-auto flex-1 custom-scrollbar">
       <table className="w-full text-left text-xs">
@@ -150,7 +133,7 @@ const MiniTable = ({ title, data = [] }) => (
         <tbody className="divide-y divide-slate-100">
           {Array.isArray(data) && data.length > 0 ? data.slice(0, 15).map((d, i) => (
             <tr key={i} className="hover:bg-slate-50 transition-colors">
-              <td className="py-2.5 px-4 text-slate-700 text-center">{d?.label || "-"}</td>
+              <td className="py-2.5 px-4 text-slate-700 text-center font-medium">{d?.label || "-"}</td>
               <td className="py-2.5 px-4 text-teal-700 font-bold text-right">{(d?.count || 0).toLocaleString("en-IN")}</td>
             </tr>
           )) : <tr><td colSpan="2" className="text-center py-4 text-slate-500">No data available</td></tr>}
@@ -181,10 +164,12 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [district, setDistrict] = useState(officeUser?.district && officeUser.district.toLowerCase() !== "all" ? officeUser.district : "");
   
   const [selectedCategory, setSelectedCategory] = useState(""); 
+  const [selectedDeeniKaam, setSelectedDeeniKaam] = useState(""); 
+  const [selectedField, setSelectedField] = useState(""); 
   
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const rowsPerPage = 10;
+  const rowsPerPage = 12;
 
   const [now, setNow] = useState(null);
   useEffect(() => {
@@ -270,6 +255,22 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return [...new Set(MASTER_CATEGORIES_MAP.map(m => m.category))].sort();
   }, []);
 
+  const availableDeeniKaam = useMemo(() => {
+    let subset = MASTER_CATEGORIES_MAP;
+    if (selectedCategory) {
+      subset = MASTER_CATEGORIES_MAP.filter(m => sameClient(m.category, selectedCategory));
+    }
+    return [...new Set(subset.map(m => m.deeniKaam))].sort();
+  }, [selectedCategory]);
+
+  const availableFields = useMemo(() => {
+    let subset = MASTER_CATEGORIES_MAP;
+    if (selectedDeeniKaam) {
+      subset = MASTER_CATEGORIES_MAP.filter(m => sameClient(m.deeniKaam, selectedDeeniKaam));
+    }
+    return [...new Set(subset.map(m => m.field))].sort();
+  }, [selectedDeeniKaam]);
+
   const availableMonths = useMemo(() => {
     const months = [...new Set(rawData.map(r => r.NormalizedMonth).filter(Boolean))];
     return months.sort().reverse();
@@ -283,6 +284,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return "COUNTRY";
   }, [region, state, division, district]);
 
+  // Unified Dynamic Processing & Aggregation Engine
   const processedTableData = useMemo(() => {
     if (!Array.isArray(rawData) || rawData.length === 0) return [];
 
@@ -297,13 +299,19 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     const validFieldsMap = {};
     MASTER_CATEGORIES_MAP.forEach(m => {
       if (selectedCategory && !sameClient(m.category, selectedCategory)) return;
+      if (selectedDeeniKaam && !sameClient(m.deeniKaam, selectedDeeniKaam)) return;
+      if (selectedField && !sameClient(m.field, selectedField)) return;
       validFieldsMap[m.field] = { category: m.category, deeniKaam: m.deeniKaam };
     });
 
     rawData.forEach(r => {
       const fld = r["Fileds"];
       if (fld && !validFieldsMap[fld]) {
-        validFieldsMap[fld] = { category: r["Category"], deeniKaam: r["Deeni Kaam"] };
+        if ((!selectedCategory || sameClient(r["Category"], selectedCategory)) &&
+            (!selectedDeeniKaam || sameClient(r["Deeni Kaam"], selectedDeeniKaam)) &&
+            (!selectedField || sameClient(fld, selectedField))) {
+          validFieldsMap[fld] = { category: r["Category"], deeniKaam: r["Deeni Kaam"] };
+        }
       }
     });
 
@@ -317,8 +325,14 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       const catVal = row["Category"] || "";
       const matchCat = !selectedCategory || sameClient(catVal, selectedCategory);
 
+      const deeniKaamVal = row["Deeni Kaam"] || "";
+      const matchDeeniKaam = !selectedDeeniKaam || sameClient(deeniKaamVal, selectedDeeniKaam);
+
+      const fieldVal = row["Fileds"] || "";
+      const matchField = !selectedField || sameClient(fieldVal, selectedField);
+
       const matchSearch = !searchTerm || JSON.stringify(row).toLowerCase().includes(searchTerm.toLowerCase().trim());
-      return matchRegion && matchState && matchDivision && matchDistrict && matchCat && matchSearch;
+      return matchRegion && matchState && matchDivision && matchDistrict && matchCat && matchDeeniKaam && matchField && matchSearch;
     });
 
     const subEntitiesSet = new Set();
@@ -366,10 +380,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
           }
         });
 
-        if (sumMain > 0 || sumVal1 > 0 || sumVal2 > 0 || !selectedCategory) {
+        if (sumMain > 0 || sumVal1 > 0 || sumVal2 > 0 || (!selectedCategory && !selectedDeeniKaam && !selectedField)) {
           let v1 = sumVal1;
           let v2 = sumVal2;
 
+          // Tab-specific calculation rules (Monthly, Average, Quarterly, Progress)
           if (activeTab === "Average Report" || activeViewMode === "average") {
             v1 = Math.round(v1 / 2);
             v2 = Math.round(v2 / 2);
@@ -393,6 +408,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
 
           resultList.push({
             LeftColValue: subEntity,
+            CategoryName: meta.category,
             DeeniKaamName: meta.deeniKaam,
             DeeniActivity: fldName,
             DynamicReportValue: sumMain,
@@ -410,7 +426,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     });
 
     return resultList;
-  }, [rawData, region, state, division, district, selectedCategory, headerTargetMode, searchTerm, colMonthMain, colMonth1, colMonth2, activeTab, activeViewMode]);
+  }, [rawData, region, state, division, district, selectedCategory, selectedDeeniKaam, selectedField, headerTargetMode, searchTerm, colMonthMain, colMonth1, colMonth2, activeTab, activeViewMode]);
 
   const pagedRows = useMemo(() => {
     if (!Array.isArray(processedTableData)) return [];
@@ -419,7 +435,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   }, [processedTableData, currentPage]);
 
   const dynamicGraphData = useMemo(() => {
-    const key = division ? "District" : state ? "Division" : region ? "State" : "Region";
     const map = {};
     if (Array.isArray(processedTableData)) {
       processedTableData.forEach(x => {
@@ -430,7 +445,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       });
     }
     return Object.keys(map).sort((a,b) => map[b] - map[a]).map(k => ({ label: k, count: map[k] }));
-  }, [processedTableData, region, state, division]);
+  }, [processedTableData]);
 
   const dynamicGraphTitle = division ? "REPORTS BY DISTRICT" : state ? "REPORTS BY DIVISION" : region ? "REPORTS BY STATE" : "REPORTS BY REGION";
   const maxDynamicCount = dynamicGraphData.length ? Math.max(...dynamicGraphData.map(d => d.count)) : 0;
@@ -485,7 +500,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   </div>
                   <div>
                     <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-wide">12 DEENI KAAM <span className="font-light text-teal-700">REPORT HUB</span></h1>
-                    <p className="text-[10px] font-bold text-teal-700 uppercase tracking-widest mt-0.5">Professional Multi-View Dashboard</p>
+                    <p className="text-[10px] font-bold text-teal-700 uppercase tracking-widest mt-0.5">Professional Multi-View Analytics Dashboard</p>
                   </div>
                 </div>
                 
@@ -560,7 +575,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
 
               {activeViewMode === "table" && (
                 <div className="flex gap-3 border-b border-slate-200 pb-2" data-html2canvas-ignore="true">
-                  {["Monthly Report", "Average Report", "Quarterly Report"].map((tab) => (
+                  {["Monthly Report", "Average Report", "Quarterly Report", "Progress Report"].map((tab) => (
                     <button
                       key={tab}
                       onClick={() => startTransition(() => setActiveTab(tab))}
@@ -576,15 +591,16 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 </div>
               )}
 
+              {/* DYNAMIC FILTERS BAR */}
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                 <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-5 border-b border-slate-100 pb-4">
                   <div className="flex items-center gap-3">
                     <Filter className="w-5 h-5 text-teal-700" />
-                    <h2 className="text-sm font-bold text-slate-800 tracking-widest uppercase">Global Filters & Options</h2>
+                    <h2 className="text-sm font-bold text-slate-800 tracking-widest uppercase">Dynamic Hierarchy & Field Filters</h2>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
                   <div className="col-span-2 md:col-span-1" data-html2canvas-ignore="true">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Search</label>
                     <div className="relative">
@@ -594,11 +610,29 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   </div>
 
                   {/* Category Filter */}
-                  <div className="flex flex-col flex-1 min-w-[130px]">
+                  <div className="flex flex-col flex-1 min-w-[110px]">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Category</label>
-                    <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
+                    <select value={selectedCategory} onChange={(e) => { setSelectedCategory(e.target.value); setSelectedDeeniKaam(""); setSelectedField(""); }} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
                       <option value="">All Categories</option>
                       {availableCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Deeni Kaam Filter */}
+                  <div className="flex flex-col flex-1 min-w-[120px]">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Deeni Kaam</label>
+                    <select value={selectedDeeniKaam} onChange={(e) => { setSelectedDeeniKaam(e.target.value); setSelectedField(""); }} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
+                      <option value="">All Deeni Kaam</option>
+                      {availableDeeniKaam.map(dk => <option key={dk} value={dk}>{dk}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Fields Filter */}
+                  <div className="flex flex-col flex-1 min-w-[120px]">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Fields</label>
+                    <select value={selectedField} onChange={(e) => setSelectedField(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
+                      <option value="">All Fields</option>
+                      {availableFields.map(fld => <option key={fld} value={fld}>{fld}</option>)}
                     </select>
                   </div>
 
@@ -608,7 +642,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     { label: "Division", val: division, set: handleSetDivision, opts: uniqValues(rawData.filter(x=>(!region||sameClient(x["Region"],region))&&(!state||sameClient(x["State"],state))), "Division") },
                     { label: "District", val: district, set: setDistrict, opts: uniqValues(rawData.filter(x=>(!region||sameClient(x["Region"],region))&&(!state||sameClient(x["State"],state))&&(!division||sameClient(x["Division"],division))), "District") }
                   ].map((f, i) => (
-                    <div key={i} className="flex flex-col flex-1 min-w-[120px]">
+                    <div key={i} className="flex flex-col flex-1 min-w-[110px]">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{f.label}</label>
                       <select value={f.val} onChange={(e) => f.set(e.target.value)} disabled={officeUser?.[f.label.toLowerCase()] && officeUser[f.label.toLowerCase()].toLowerCase() !== "all"} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer disabled:bg-slate-50 disabled:text-slate-400">
                         <option value="">{f.val || "All"}</option>
@@ -619,7 +653,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 </div>
               </div>
 
-              {/* GRAPHS VIEW */}
+              {/* GRAPHS VIEW MODE */}
               {activeViewMode === "graphs" && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fadeIn">
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 h-[400px] flex flex-col">
@@ -642,8 +676,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[400px]">
-                    <MiniTable title="STATE WISE METRICS" data={groupCount(processedTableData, "State")} />
-                    <MiniTable title="DISTRICT WISE METRICS" data={groupCount(processedTableData, "District")} />
+                    <MiniTable title="CATEGORY WISE METRICS" data={groupCount(processedTableData, "CategoryName")} />
+                    <MiniTable title="GEOGRAPHIC WISE METRICS" data={groupCount(processedTableData, "LeftColValue")} />
                   </div>
                 </div>
               )}
@@ -656,9 +690,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
             <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 bg-[#e0f2f1] rounded-t-xl">
               <div>
                 <h2 className="text-sm font-bold text-teal-800 uppercase tracking-widest">
-                  {activeViewMode === "average" ? "Average & Range Comparison Matrix" : activeViewMode === "targets" ? "Targets & Achievement Matrix" : `Detailed Telemetry Output (${activeTab})`}
+                  {activeTab === "Progress Report" ? "Progress & Growth Matrix" : activeTab === "Quarterly Report" ? "Quarterly Comparative Analysis" : activeTab === "Average Report" ? "Average Performance Matrix" : `Detailed Telemetry Output (${activeTab})`}
                 </h2>
-                <p className="text-[10px] font-bold text-teal-800 mt-1 uppercase tracking-widest">Source: {rawData.length} &bull; Visible: {processedTableData.length}</p>
+                <p className="text-[10px] font-bold text-teal-800 mt-1 uppercase tracking-widest">Source Records: {rawData.length} &bull; Visible Rows: {processedTableData.length}</p>
               </div>
             </div>
 
@@ -671,6 +705,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                         {leftHeaderTitle}
                       </th>
                     )}
+                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">CATEGORY</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">DEENI KAAM</th>
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">FIELDS</th>
                     
@@ -741,6 +776,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                         <td className="px-2 py-2 font-bold text-teal-800 leading-tight border-r border-slate-100 text-center">{row?.LeftColValue || "-"}</td>
                       )}
                       
+                      <td className="px-2 py-2 font-semibold text-slate-700 leading-tight border-r border-slate-100 text-center">{row?.CategoryName || "-"}</td>
                       <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100 text-center">{row?.DeeniKaamName || "-"}</td>
                       <td className="px-2 py-2 font-bold text-slate-700 leading-tight border-r border-slate-100 text-center">{row?.DeeniActivity || "-"}</td>
                       
@@ -757,7 +793,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     </tr>
                   )) : (
                     <tr>
-                      <td colSpan={district ? 8 : 9} className="px-6 py-12 text-center text-slate-500 text-xs uppercase tracking-widest">
+                      <td colSpan={district ? 9 : 10} className="px-6 py-12 text-center text-slate-500 text-xs uppercase tracking-widest">
                         <div className="flex flex-col items-center justify-center gap-3">
                           <Activity className="w-6 h-6 opacity-40 text-teal-600" />
                           <span>{loading ? "Establishing connection..." : "No matching telemetry found"}</span>
