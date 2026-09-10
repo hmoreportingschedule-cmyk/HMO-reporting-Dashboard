@@ -265,7 +265,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return [...new Set(subset.map(m => m.field))].sort();
   }, [selectedDeeniKaam]);
 
-  // Dynamic Left Column Header and Row Label based on hierarchy
   const leftHeaderTitle = useMemo(() => {
     if (district) return "";
     if (division) return "DISTRICT";
@@ -277,6 +276,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const processedTableData = useMemo(() => {
     if (!Array.isArray(rawData)) return [];
     
+    // Determine target month (default to startMonth or endMonth or latest available in rawData)
+    const activeMonth = endMonth || startMonth || (rawData.length > 0 ? rawData[0].NormalizedMonth : "");
+
     const baseFiltered = rawData.filter((row) => {
       if (!row) return false;
       const matchRegion = !region || sameClient(row["Region"], region);
@@ -293,8 +295,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       const fieldVal = row["Fileds"] || "";
       const matchField = !selectedField || sameClient(fieldVal, selectedField);
 
+      // Strict Month matching for active view
+      const matchMonth = !activeMonth || row.NormalizedMonth === activeMonth;
+
       const matchSearch = !searchTerm || JSON.stringify(row).toLowerCase().includes(searchTerm.toLowerCase().trim());
-      return matchRegion && matchState && matchDivision && matchDistrict && matchCat && matchDeeniKaam && matchField && matchSearch;
+      return matchRegion && matchState && matchDivision && matchDistrict && matchCat && matchDeeniKaam && matchField && matchMonth && matchSearch;
     });
 
     const getLeftColName = (r) => {
@@ -305,17 +310,21 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       return "India";
     };
 
-    // Strict Month-wise Aggregation Engine
     const getAggregatedValForMonth = (targetMo, groupKeyFilter, subFilterName, isTargetOrAch = false) => {
       let totalRep = 0;
       let totalTarget = 0;
 
-      baseFiltered.forEach(r => {
+      rawData.forEach(r => {
         if (!r) return;
         const mo = r.NormalizedMonth || "";
-        // Strict month match: if targetMo is specified, row month must equal targetMo
         if (targetMo && mo !== targetMo) return;
-        
+
+        // Apply geographic filters
+        if (region && !sameClient(r["Region"], region)) return;
+        if (state && !sameClient(r["State"], state)) return;
+        if (division && !sameClient(r["Division"], division)) return;
+        if (district && !sameClient(r["District"], district)) return;
+
         const fld = String(r["Fileds"] || "").trim();
         let matchesGroup = false;
 
@@ -349,11 +358,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       const compositeKey = `${leftVal}|${dkName}|${fld}`;
 
       if (!aggregatedMap[compositeKey]) {
-        // Default target month: if startMonth or endMonth is selected, use it. Otherwise use row's month or latest available.
-        const targetMo = endMonth || startMonth || row.NormalizedMonth || "";
-        
-        const curRep = getAggregatedValForMonth(targetMo, fld, leftVal);
-        const targetAchObj = getAggregatedValForMonth(targetMo, fld, leftVal, true);
+        const curRep = row.NumericReport || 0;
+        const targetAchObj = { target: row.Target || 0, report: curRep };
 
         let v1 = startMonth ? getAggregatedValForMonth(startMonth, fld, leftVal) : curRep;
         let v2 = endMonth ? getAggregatedValForMonth(endMonth, fld, leftVal) : curRep;
@@ -381,7 +387,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
           LeftColValue: leftVal,
           DeeniKaamName: dkName,
           DeeniActivity: fld,
-          DynamicMonthDisplay: formatMonthYearLabel(targetMo),
+          DynamicMonthDisplay: formatMonthYearLabel(activeMonth),
           DynamicReportValue: curRep,
           DynamicTarget: targetAchObj.target,
           DynamicAchievement: targetAchObj.target > 0 ? ((curRep / targetAchObj.target) * 100).toFixed(1) + "%" : "-",
