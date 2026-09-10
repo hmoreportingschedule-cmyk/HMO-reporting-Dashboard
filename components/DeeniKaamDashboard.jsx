@@ -169,9 +169,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [activeViewMode, setActiveViewMode] = useState("table"); 
   const [activeTab, setActiveTab] = useState("Monthly Report");
   
-  const [colMonthMain, setColMonthMain] = useState(""); 
-  const [colMonth1, setColMonth1] = useState(""); 
-  const [colMonth2, setColMonth2] = useState(""); 
+  const [colMonthMain, setColMonthMain] = useState("2026-11"); 
+  const [colMonth1, setColMonth1] = useState("2026-11"); 
+  const [colMonth2, setColMonth2] = useState("2026-12"); 
   
   const [headerTargetMode, setHeaderTargetMode] = useState("");
 
@@ -676,8 +676,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">FIELDS</th>
                     
                     {/* Main Report Column with Transparent Border Pill Selector */}
-                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
-                      <div className="inline-flex items-center justify-center bg-transparent border border-white/60 rounded-lg px-3 py-1 hover:border-white transition-colors cursor-pointer shadow-sm">
+                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#008b8b]">
+                      <div className="inline-flex items-center justify-center bg-transparent border border-white/80 rounded-lg px-3 py-1 hover:border-white transition-colors cursor-pointer shadow-sm">
                         <select 
                           value={colMonthMain} 
                           onChange={(e) => setColMonthMain(e.target.value)} 
@@ -697,10 +697,10 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     </th>
 
                     {/* Targets Column with Transparent Border Pill Selector */}
-                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
+                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#008b8b]">
                       <div className="flex items-center justify-center gap-2">
                         <span>TARGETS</span>
-                        <div className="inline-flex items-center justify-center bg-transparent border border-white/60 rounded-lg px-2 py-0.5 hover:border-white transition-colors cursor-pointer shadow-sm">
+                        <div className="inline-flex items-center justify-center bg-transparent border border-white/80 rounded-lg px-2.5 py-0.5 hover:border-white transition-colors cursor-pointer shadow-sm">
                           <select 
                             value={headerTargetMode} 
                             onChange={(e) => setHeaderTargetMode(e.target.value)}
@@ -720,11 +720,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       </div>
                     </th>
 
-                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">ACHIEVEMENT (%)</th>
+                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#008b8b]">ACHIEVEMENT (%)</th>
                     
                     {/* Comparison Column 1 Pill Selector */}
-                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
-                      <div className="inline-flex items-center justify-center bg-transparent border border-white/60 rounded-lg px-3 py-1 hover:border-white transition-colors cursor-pointer shadow-sm">
+                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#008b8b]">
+                      <div className="inline-flex items-center justify-center bg-transparent border border-white/80 rounded-lg px-3 py-1 hover:border-white transition-colors cursor-pointer shadow-sm">
                         <select 
                           value={colMonth1} 
                           onChange={(e) => setColMonth1(e.target.value)} 
@@ -744,8 +744,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     </th>
 
                     {/* Comparison Column 2 Pill Selector */}
-                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
-                      <div className="inline-flex items-center justify-center bg-transparent border border-white/60 rounded-lg px-3 py-1 hover:border-white transition-colors cursor-pointer shadow-sm">
+                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#008b8b]">
+                      <div className="inline-flex items-center justify-center bg-transparent border border-white/80 rounded-lg px-3 py-1 hover:border-white transition-colors cursor-pointer shadow-sm">
                         <select 
                           value={colMonth2} 
                           onChange={(e) => setColMonth2(e.target.value)} 
@@ -764,7 +764,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                       </div>
                     </th>
 
-                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider text-center bg-[#007a7a]">COMPARISON (%)</th>
+                    <th className="px-2 py-3 font-bold text-white uppercase tracking-wider text-center bg-[#008b8b]">COMPARISON (%)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
