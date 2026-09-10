@@ -162,12 +162,10 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [activeViewMode, setActiveViewMode] = useState("table"); 
   const [activeTab, setActiveTab] = useState("Monthly Report");
   
-  // Independent Column Month Selectors
-  const [colMonthMain, setColMonthMain] = useState("2026-07"); 
-  const [colMonth1, setColMonth1] = useState("2026-06"); 
-  const [colMonth2, setColMonth2] = useState("2026-07"); 
+  const [colMonthMain, setColMonthMain] = useState(""); 
+  const [colMonth1, setColMonth1] = useState(""); 
+  const [colMonth2, setColMonth2] = useState(""); 
   
-  // Header Targets Selector (Standard, 26%, 52%)
   const [headerTargetMode, setHeaderTargetMode] = useState("");
 
   const [region, setRegion] = useState(officeUser?.region && officeUser.region.toLowerCase() !== "all" ? officeUser.region : "");
@@ -176,8 +174,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [district, setDistrict] = useState(officeUser?.district && officeUser.district.toLowerCase() !== "all" ? officeUser.district : "");
   
   const [selectedCategory, setSelectedCategory] = useState(""); 
-  const [selectedDeeniKaam, setSelectedDeeniKaam] = useState(""); 
-  const [selectedField, setSelectedField] = useState(""); 
   
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -267,22 +263,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return [...new Set(MASTER_CATEGORIES_MAP.map(m => m.category))].sort();
   }, []);
 
-  const availableDeeniKaam = useMemo(() => {
-    let subset = MASTER_CATEGORIES_MAP;
-    if (selectedCategory) {
-      subset = MASTER_CATEGORIES_MAP.filter(m => sameClient(m.category, selectedCategory));
-    }
-    return [...new Set(subset.map(m => m.deeniKaam))].sort();
-  }, [selectedCategory]);
-
-  const availableFields = useMemo(() => {
-    let subset = MASTER_CATEGORIES_MAP;
-    if (selectedDeeniKaam) {
-      subset = MASTER_CATEGORIES_MAP.filter(m => sameClient(m.deeniKaam, selectedDeeniKaam));
-    }
-    return [...new Set(subset.map(m => m.field))].sort();
-  }, [selectedDeeniKaam]);
-
   const availableMonths = useMemo(() => {
     const months = [...new Set(rawData.map(r => r.NormalizedMonth).filter(Boolean))];
     return months.sort().reverse();
@@ -296,7 +276,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return "COUNTRY";
   }, [region, state, division, district]);
 
-  // Accurate SUM Aggregation Engine for India > Region > State > Division hierarchy per Field
   const processedTableData = useMemo(() => {
     if (!Array.isArray(rawData) || rawData.length === 0) return [];
 
@@ -311,17 +290,13 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     const validFieldsMap = {};
     MASTER_CATEGORIES_MAP.forEach(m => {
       if (selectedCategory && !sameClient(m.category, selectedCategory)) return;
-      if (selectedDeeniKaam && !sameClient(m.deeniKaam, selectedDeeniKaam)) return;
-      if (selectedField && !sameClient(m.field, selectedField)) return;
       validFieldsMap[m.field] = { category: m.category, deeniKaam: m.deeniKaam };
     });
 
     rawData.forEach(r => {
       const fld = r["Fileds"];
       if (fld && !validFieldsMap[fld]) {
-        if (!selectedField || sameClient(fld, selectedField)) {
-          validFieldsMap[fld] = { category: r["Category"], deeniKaam: r["Deeni Kaam"] };
-        }
+        validFieldsMap[fld] = { category: r["Category"], deeniKaam: r["Deeni Kaam"] };
       }
     });
 
@@ -335,14 +310,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       const catVal = row["Category"] || "";
       const matchCat = !selectedCategory || sameClient(catVal, selectedCategory);
 
-      const deeniKaamVal = row["Deeni Kaam"] || "";
-      const matchDeeniKaam = !selectedDeeniKaam || sameClient(deeniKaamVal, selectedDeeniKaam);
-
-      const fieldVal = row["Fileds"] || "";
-      const matchField = !selectedField || sameClient(fieldVal, selectedField);
-
       const matchSearch = !searchTerm || JSON.stringify(row).toLowerCase().includes(searchTerm.toLowerCase().trim());
-      return matchRegion && matchState && matchDivision && matchDistrict && matchCat && matchDeeniKaam && matchField && matchSearch;
+      return matchRegion && matchState && matchDivision && matchDistrict && matchCat && matchSearch;
     });
 
     const subEntitiesSet = new Set();
@@ -357,9 +326,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       Object.keys(validFieldsMap).forEach(fldName => {
         const meta = validFieldsMap[fldName];
 
-        let sumMain = 0; // for colMonthMain
-        let sumVal1 = 0; // for comparison colMonth1
-        let sumVal2 = 0; // for comparison colMonth2
+        let sumMain = 0; 
+        let sumVal1 = 0; 
+        let sumVal2 = 0; 
         let sumTarget = 0;
 
         filteredRows.forEach(r => {
@@ -390,7 +359,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
           }
         });
 
-        if (sumMain > 0 || sumVal1 > 0 || sumVal2 > 0 || (!selectedCategory && !selectedDeeniKaam && !selectedField)) {
+        if (sumMain > 0 || sumVal1 > 0 || sumVal2 > 0 || !selectedCategory) {
           let v1 = sumVal1;
           let v2 = sumVal2;
 
@@ -434,7 +403,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     });
 
     return resultList;
-  }, [rawData, region, state, division, district, selectedCategory, selectedDeeniKaam, selectedField, headerTargetMode, searchTerm, colMonthMain, colMonth1, colMonth2, activeTab, activeViewMode]);
+  }, [rawData, region, state, division, district, selectedCategory, headerTargetMode, searchTerm, colMonthMain, colMonth1, colMonth2, activeTab, activeViewMode]);
 
   const pagedRows = useMemo(() => {
     if (!Array.isArray(processedTableData)) return [];
@@ -608,7 +577,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-8 gap-3">
+                {/* Cleaned up Global Filters Bar (Deeni Kaam, Fields, Targets removed as requested) */}
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                   <div className="col-span-2 md:col-span-1" data-html2canvas-ignore="true">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Search</label>
                     <div className="relative">
@@ -618,39 +588,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   </div>
 
                   {/* Category Filter */}
-                  <div className="flex flex-col flex-1 min-w-[120px]">
+                  <div className="flex flex-col flex-1 min-w-[130px]">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Category</label>
-                    <select value={selectedCategory} onChange={(e) => { setSelectedCategory(e.target.value); setSelectedDeeniKaam(""); setSelectedField(""); }} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
+                    <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
                       <option value="">All Categories</option>
                       {availableCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                    </select>
-                  </div>
-
-                  {/* Deeni Kaam Filter */}
-                  <div className="flex flex-col flex-1 min-w-[130px]">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Deeni Kaam</label>
-                    <select value={selectedDeeniKaam} onChange={(e) => { setSelectedDeeniKaam(e.target.value); setSelectedField(""); }} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
-                      <option value="">All Deeni Kaam</option>
-                      {availableDeeniKaam.map(dk => <option key={dk} value={dk}>{dk}</option>)}
-                    </select>
-                  </div>
-
-                  {/* Fields Filter */}
-                  <div className="flex flex-col flex-1 min-w-[130px]">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Fields</label>
-                    <select value={selectedField} onChange={(e) => setSelectedField(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
-                      <option value="">All Fields</option>
-                      {availableFields.map(fld => <option key={fld} value={fld}>{fld}</option>)}
-                    </select>
-                  </div>
-
-                  {/* Targets Filter (Standard / 26% / 52%) */}
-                  <div className="flex flex-col flex-1 min-w-[90px]">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Targets</label>
-                    <select value={headerTargetMode} onChange={(e) => setHeaderTargetMode(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
-                      <option value="">Standard</option>
-                      <option value="26%">Target 26%</option>
-                      <option value="52%">Target 52%</option>
                     </select>
                   </div>
 
@@ -660,7 +602,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     { label: "Division", val: division, set: handleSetDivision, opts: uniqValues(rawData.filter(x=>(!region||sameClient(x["Region"],region))&&(!state||sameClient(x["State"],state))), "Division") },
                     { label: "District", val: district, set: setDistrict, opts: uniqValues(rawData.filter(x=>(!region||sameClient(x["Region"],region))&&(!state||sameClient(x["State"],state))&&(!division||sameClient(x["Division"],division))), "District") }
                   ].map((f, i) => (
-                    <div key={i} className="flex flex-col flex-1 min-w-[110px]">
+                    <div key={i} className="flex flex-col flex-1 min-w-[120px]">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{f.label}</label>
                       <select value={f.val} onChange={(e) => f.set(e.target.value)} disabled={officeUser?.[f.label.toLowerCase()] && officeUser[f.label.toLowerCase()].toLowerCase() !== "all"} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer disabled:bg-slate-50 disabled:text-slate-400">
                         <option value="">{f.val || "All"}</option>
