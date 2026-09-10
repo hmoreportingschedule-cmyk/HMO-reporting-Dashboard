@@ -18,7 +18,7 @@ const parseSheet = (url) => {
       download: true,
       header: true,
       skipEmptyLines: true,
-      complete: (results) => resolve(results.data || []),
+      complete: (results) => resolve(results?.data || []),
       error: () => resolve([])
     });
   });
@@ -26,19 +26,34 @@ const parseSheet = (url) => {
 
 const sameClient = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
-const uniqValues = (data, key) => {
-  return [...new Set(data.map(x => String(x[key] || "").trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+const groupCount = (data = [], key) => {
+  if (!Array.isArray(data)) return [];
+  const map = {};
+  data.forEach(x => {
+      if (!x) return;
+      const k = String(x[key] || "Unknown").trim();
+      const n = Number(String(x["Report Value"] || x.report || "0").replace(/,/g, ""));
+      map[k] = (map[k] || 0) + (isNaN(n) ? 0 : n);
+  });
+  return Object.keys(map).sort((a,b) => map[b] - map[a]).map(k => ({ label: k, count: map[k] }));
+};
+
+const uniqValues = (data = [], key) => {
+  if (!Array.isArray(data)) return [];
+  return [...new Set(data.map(x => String(x?.[key] || "").trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b));
 };
 
 const formatMonthYearLabel = (val) => {
   if (!val) return "Month With Year";
-  const [year, month] = val.split("-");
-  if (!year || !month) return val;
-  const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-  return date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+  const parts = val.split("-");
+  if (parts.length < 2) return val;
+  const [year, month] = parts;
+  const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
+  return isNaN(date.getTime()) ? val : date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
 };
 
 const parseRowMonth = (row) => {
+  if (!row) return "";
   let raw = String(row["Month"] || row["Date"] || row["Report Date"] || "").trim();
   if (!raw) return "";
   if (/^\d{4}-\d{2}$/.test(raw)) return raw;
@@ -63,7 +78,7 @@ const parseRowMonth = (row) => {
   return raw;
 };
 
-const MiniTable = ({ title, data }) => (
+const MiniTable = ({ title, data = [] }) => (
   <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[340px]">
     <div className="p-4 border-b border-slate-100">
       <h3 className="text-teal-700 font-bold uppercase tracking-widest text-xs">{title}</h3>
@@ -77,10 +92,10 @@ const MiniTable = ({ title, data }) => (
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {data.length > 0 ? data.slice(0, 15).map((d, i) => (
+          {Array.isArray(data) && data.length > 0 ? data.slice(0, 15).map((d, i) => (
             <tr key={i} className="hover:bg-slate-50 transition-colors">
-              <td className="py-2.5 px-4 text-slate-700">{d.label}</td>
-              <td className="py-2.5 px-4 text-teal-700 font-bold text-right">{d.count.toLocaleString("en-IN")}</td>
+              <td className="py-2.5 px-4 text-slate-700">{d?.label || "-"}</td>
+              <td className="py-2.5 px-4 text-teal-700 font-bold text-right">{(d?.count || 0).toLocaleString("en-IN")}</td>
             </tr>
           )) : <tr><td colSpan="2" className="text-center py-4 text-slate-500">No data available</td></tr>}
         </tbody>
@@ -93,7 +108,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [rawData, setRawData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState("");
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   const [activeViewMode, setActiveViewMode] = useState("table"); 
   const [activeTab, setActiveTab] = useState("Monthly Report");
@@ -129,19 +144,20 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     setFetchError("");
     try {
       const resultsArray = await Promise.all(SHEET_URLS.map(url => parseSheet(url)));
-      const combinedData = resultsArray.flat();
+      const combinedData = resultsArray.flat().filter(Boolean);
       if (combinedData.length > 0) {
         const processed = combinedData.map(row => {
+          if (!row) return null;
           let reportVal = Number(String(row["Report Value"] || row.report || "0").replace(/,/g, ""));
           let targetVal = Number(String(row["Target"] || "0").replace(/,/g, ""));
           return {
             ...row,
-            Target: targetVal,
+            Target: isNaN(targetVal) ? 0 : targetVal,
             Achievement: Number(String(row["Achievement"] || row["Achivement"] || "0").replace(/,/g, "")),
             NormalizedMonth: parseRowMonth(row),
-            NumericReport: reportVal
+            NumericReport: isNaN(reportVal) ? 0 : reportVal
           };
-        });
+        }).filter(Boolean);
         setRawData(processed);
       } else {
         setFetchError("Data stream empty or connection lost.");
@@ -153,17 +169,34 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     }
   };
 
+  const handleSetRegion = (v) => {
+    setRegion(v);
+    if(!(officeUser?.state && officeUser.state.toLowerCase() !== "all")) setState("");
+    if(!(officeUser?.division && officeUser.division.toLowerCase() !== "all")) setDivision("");
+    if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
+  };
+  const handleSetState = (v) => {
+    setState(v);
+    if(!(officeUser?.division && officeUser.division.toLowerCase() !== "all")) setDivision("");
+    if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
+  };
+  const handleSetDivision = (v) => {
+    setDivision(v);
+    if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
+  };
+
   const availableFields = useMemo(() => {
     let subset = rawData;
     if (selectedCategory) {
-      subset = rawData.filter(x => sameClient(x["Category"], selectedCategory));
+      subset = rawData.filter(x => sameClient(x?.["Category"], selectedCategory));
     }
     return uniqValues(subset, "Fileds");
   }, [rawData, selectedCategory]);
 
-  // Optimized Non-Blocking Processing & Aggregation
   const processedTableData = useMemo(() => {
+    if (!Array.isArray(rawData)) return [];
     const baseFiltered = rawData.filter((row) => {
+      if (!row) return false;
       const matchRegion = !region || sameClient(row["Region"], region);
       const matchState = !state || sameClient(row["State"], state);
       const matchDivision = !division || sameClient(row["Division"], division);
@@ -177,6 +210,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
 
     const uniqueMap = {};
     baseFiltered.forEach(row => {
+      if (!row) return;
       const reg = String(row["Region"] || "").trim();
       const st = String(row["State"] || "").trim();
       const div = String(row["Division"] || "").trim();
@@ -206,6 +240,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       let v1 = 0;
       if (startMonth) {
         const matchRow1 = rawData.find(r => 
+          r && 
           sameClient(r["Region"], reg) && 
           sameClient(r["State"], st) && 
           sameClient(r["Division"], div) && 
@@ -213,7 +248,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
           sameClient(r["Fileds"] || r["Fields"] || "", fld) && 
           r.NormalizedMonth === startMonth
         );
-        v1 = matchRow1 ? matchRow1.NumericReport : 0;
+        v1 = matchRow1 ? (matchRow1.NumericReport || 0) : 0;
       } else {
         v1 = row.NumericReport || 0;
       }
@@ -221,6 +256,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       let v2 = 0;
       if (endMonth) {
         const matchRow2 = rawData.find(r => 
+          r && 
           sameClient(r["Region"], reg) && 
           sameClient(r["State"], st) && 
           sameClient(r["Division"], div) && 
@@ -228,7 +264,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
           sameClient(r["Fileds"] || r["Fields"] || "", fld) && 
           r.NormalizedMonth === endMonth
         );
-        v2 = matchRow2 ? matchRow2.NumericReport : 0;
+        v2 = matchRow2 ? (matchRow2.NumericReport || 0) : 0;
       } else {
         v2 = row.NumericReport || 0;
       }
@@ -262,6 +298,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   }, [rawData, region, state, division, district, selectedCategory, selectedField, searchTerm, startMonth, endMonth, activeTab, activeViewMode]);
 
   const pagedRows = useMemo(() => {
+    if (!Array.isArray(processedTableData)) return [];
     const start = (currentPage - 1) * rowsPerPage;
     return processedTableData.slice(start, start + rowsPerPage);
   }, [processedTableData, currentPage]);
@@ -269,11 +306,14 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const dynamicGraphData = useMemo(() => {
     const key = division ? "District" : state ? "Division" : region ? "State" : "Region";
     const map = {};
-    processedTableData.forEach(x => {
-      const k = (x[key] || "Unknown").trim();
-      const n = Number(x["Report Value"] || x.NumericReport || 0);
-      map[k] = (map[k] || 0) + (isNaN(n) ? 0 : n);
-    });
+    if (Array.isArray(processedTableData)) {
+      processedTableData.forEach(x => {
+        if (!x) return;
+        const k = String(x[key] || "Unknown").trim();
+        const n = Number(x["Report Value"] || x.NumericReport || 0);
+        map[k] = (map[k] || 0) + (isNaN(n) ? 0 : n);
+      });
+    }
     return Object.keys(map).sort((a,b) => map[b] - map[a]).map(k => ({ label: k, count: map[k] }));
   }, [processedTableData, region, state, division]);
 
@@ -594,25 +634,25 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   <tbody className="divide-y divide-slate-100">
                     {pagedRows.length > 0 ? pagedRows.map((row, idx) => (
                       <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["Region"] || "-"}</td>
-                        <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["State"] || "-"}</td>
-                        <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["Division"] || "-"}</td>
-                        <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row["District"] || "-"}</td>
+                        <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row?.["Region"] || "-"}</td>
+                        <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row?.["State"] || "-"}</td>
+                        <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row?.["Division"] || "-"}</td>
+                        <td className="px-2 py-2 text-slate-600 leading-tight border-r border-slate-100">{row?.["District"] || "-"}</td>
                         
-                        <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100">{row["Fileds"] || row["Fields"] || row["Deeni Activities"] || "-"}</td>
+                        <td className="px-2 py-2 font-bold text-slate-800 leading-tight border-r border-slate-100">{row?.["Fileds"] || row?.["Fields"] || row?.["Deeni Activities"] || "-"}</td>
                         
-                        <td className="px-2 py-2 text-right font-extrabold text-teal-700 text-sm bg-teal-50/40 border-r border-slate-100">{row["Report Value"] || row.report || "0"}</td>
+                        <td className="px-2 py-2 text-right font-extrabold text-teal-700 text-sm bg-teal-50/40 border-r border-slate-100">{(row?.["Report Value"] || row?.report || "0")}</td>
                         
-                        <td className="px-2 py-2 text-slate-600 text-center border-r border-slate-100">{row["Month"] || "-"}</td>
+                        <td className="px-2 py-2 text-slate-600 text-center border-r border-slate-100">{row?.["Month"] || "-"}</td>
                         
-                        <td className="px-2 py-2 text-slate-600 text-right border-r border-slate-100">{row["Target"] || "-"}</td>
-                        <td className="px-2 py-2 text-blue-600 font-bold text-right border-r border-slate-100">{row["Achievement %"] || row["Achievement"] || "-"}</td>
+                        <td className="px-2 py-2 text-slate-600 text-right border-r border-slate-100">{row?.["Target"] || "-"}</td>
+                        <td className="px-2 py-2 text-blue-600 font-bold text-right border-r border-slate-100">{row?.["Achievement %"] || row?.["Achievement"] || "-"}</td>
                         
-                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row.Val1}</td>
-                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row.Val2}</td>
+                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row?.Val1 ?? 0}</td>
+                        <td className="px-2 py-2 text-slate-700 text-center border-r border-slate-100 font-semibold">{row?.Val2 ?? 0}</td>
                         
-                        <td className={`px-2 py-2 font-bold text-center ${String(row.CalculatedComparison).startsWith("+") ? "text-emerald-600" : "text-red-600"}`}>
-                          {row.CalculatedComparison}
+                        <td className={`px-2 py-2 font-bold text-center ${String(row?.CalculatedComparison || "").startsWith("+") ? "text-emerald-600" : "text-red-600"}`}>
+                          {row?.CalculatedComparison || "0.0%"}
                         </td>
                       </tr>
                     )) : (
