@@ -186,9 +186,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return uniqValues(subset, "Fileds");
   }, [rawData, selectedCategory]);
 
-  // Build Month-Wise Lookup Map for exact startMonth and endMonth values per location & activity
   const processedTableData = useMemo(() => {
-    // 1. Filter rawData based on global filters (region, state, division, district, category, field, search)
     const baseFiltered = rawData.filter((row) => {
       const matchRegion = !region || sameClient(row["Region"], region);
       const matchState = !state || sameClient(row["State"], state);
@@ -201,7 +199,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       return matchRegion && matchState && matchDivision && matchDistrict && matchCat && matchField && matchSearch;
     });
 
-    // 2. Group unique rows by Region, State, Division, District, and Field (Deeni Activities)
     const uniqueMap = {};
     baseFiltered.forEach(row => {
       const reg = String(row["Region"] || "").trim();
@@ -223,7 +220,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       }
     });
 
-    // 3. For each unique row, calculate Val1 (startMonth), Val2 (endMonth), and accurate Percentage Comparison
     return Object.values(uniqueMap).map(row => {
       const reg = row.Region;
       const st = row.State;
@@ -231,7 +227,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       const dist = row.District;
       const fld = row.Fileds;
 
-      // Find report value for startMonth
       let v1 = 0;
       if (startMonth) {
         const matchRow1 = rawData.find(r => 
@@ -247,7 +242,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         v1 = row.NumericReport || 0;
       }
 
-      // Find report value for endMonth
       let v2 = 0;
       if (endMonth) {
         const matchRow2 = rawData.find(r => 
@@ -263,7 +257,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         v2 = row.NumericReport || 0;
       }
 
-      // Handle Tab calculations (Average / Quarterly)
       if (activeTab === "Average Report" || activeViewMode === "average") {
         v1 = Math.round(v1 / 2);
         v2 = Math.round(v2 / 2);
@@ -272,14 +265,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         v2 = v2 * 3;
       }
 
-      // Accurate Percentage Change Formula: ((v2 - v1) / v1) * 100
       let diffPercent = 0;
       if (v1 > 0) {
         diffPercent = ((v2 - v1) / v1) * 100;
       } else if (v1 === 0 && v2 > 0) {
         diffPercent = 100;
-      } else if (v1 === 0 && v2 === 0) {
-        diffPercent = 0;
       } else if (v1 > 0 && v2 === 0) {
         diffPercent = -100;
       }
