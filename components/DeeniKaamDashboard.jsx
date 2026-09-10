@@ -193,11 +193,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return uniqValues(subset, "Fileds");
   }, [rawData, selectedCategory]);
 
-  // Aggregation Engine for India / Region / State / Division / District Totals
   const processedTableData = useMemo(() => {
     if (!Array.isArray(rawData)) return [];
     
-    // 1. Filter rawData based on UI filters
     const baseFiltered = rawData.filter((row) => {
       if (!row) return false;
       const matchRegion = !region || sameClient(row["Region"], region);
@@ -211,19 +209,13 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       return matchRegion && matchState && matchDivision && matchDistrict && matchCat && matchField && matchSearch;
     });
 
-    // 2. Determine aggregation grouping key based on selected filters
-    // If no filter -> group by Field (India level total)
-    // If Region selected -> group by State + Field
-    // If State selected -> group by Division + Field
-    // If Division selected -> group by District + Field
-    // If District selected -> group by District + Field
     const getGroupKey = (r) => {
       const fld = String(r["Fileds"] || r["Fields"] || r["Deeni Activities"] || "").trim();
       if (district) return `${String(r["District"] || "").trim()}|${fld}`;
       if (division) return `${String(r["District"] || "").trim()}|${fld}`;
       if (state) return `${String(r["Division"] || "").trim()}|${fld}`;
       if (region) return `${String(r["State"] || "").trim()}|${fld}`;
-      return fld; // India Level Total
+      return fld;
     };
 
     const getLeftColName = (r) => {
@@ -234,11 +226,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       return "India";
     };
 
-    // Helper to get aggregated report value for a specific month & group key
     const getAggregatedValForMonth = (targetMo, groupKeyFilter, isTargetOrAch = false) => {
       let totalRep = 0;
       let totalTarget = 0;
-      let count = 0;
 
       baseFiltered.forEach(r => {
         if (!r) return;
@@ -256,7 +246,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         if (matchesGroup) {
           totalRep += r.NumericReport || 0;
           totalTarget += r.Target || 0;
-          count++;
         }
       });
 
@@ -266,7 +255,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       return totalRep;
     };
 
-    // Group and aggregate data
     const aggregatedMap = {};
     baseFiltered.forEach(row => {
       if (!row) return;
@@ -277,11 +265,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       if (!aggregatedMap[gKey]) {
         const targetMo = endMonth || startMonth || row.NormalizedMonth || "";
         
-        // Current report value (for selected month or total)
         const curRep = getAggregatedValForMonth(targetMo, gKey);
         const targetAchObj = getAggregatedValForMonth(targetMo, gKey, true);
 
-        // Val1 (Start Month) & Val2 (End Month) for comparison
         let v1 = startMonth ? getAggregatedValForMonth(startMonth, gKey) : curRep;
         let v2 = endMonth ? getAggregatedValForMonth(endMonth, gKey) : curRep;
 
@@ -630,41 +616,20 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                 <table className="min-w-full text-left text-[11px] lg:text-xs">
                   <thead className="bg-[#008b8b]">
                     <tr>
-                      <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">
-                        {!region && !state && !division && !district && "COUNTRY"}
-                        {region && !state && !division && !district && "REGION"}
-                        {state && !division && !district && "STATE"}
-                        {division && !district && "DIVISION"}
-                        {district && "DISTRICT"}
-                      </th>
+                      <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">COUNTRY</th>
                       <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 align-middle text-center">DEENI ACTIVITIES</th>
-                      <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-r border-white/25 text-center">ACHIEVEMENT</th>
-                      <th colSpan="3" className="px-2 py-2 font-bold text-white uppercase tracking-wider border-b border-white/25 text-center">COMPARISON REPORT</th>
-                    </tr>
-                    <tr>
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
-                        {!region && !state && !division && !district && "INDIA"}
-                        {region && !state && !division && !district && region}
-                        {state && !division && !district && state}
-                        {division && !district && division}
-                        {district && district}
-                      </th>
-                      
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">DEENI ACTIVITIES</th>
-                      
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
+                      <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
                         {formatMonthYearLabel(endMonth || startMonth || "Month")}
                       </th>
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/25 text-right bg-[#007a7a]">TARGETS</th>
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/25 text-right bg-[#007a7a]">ACHIEVEMENT (%)</th>
-                      
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
+                      <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-right bg-[#007a7a]">TARGETS</th>
+                      <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-right bg-[#007a7a]">ACHIEVEMENT (%)</th>
+                      <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
                         {formatMonthYearLabel(startMonth)}
                       </th>
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
+                      <th className="px-2 py-3 font-bold text-white uppercase tracking-wider border-r border-white/25 text-center bg-[#007a7a]">
                         {formatMonthYearLabel(endMonth)}
                       </th>
-                      <th className="px-2 py-2 font-bold text-white uppercase tracking-wider text-center bg-[#007a7a]">COMPARISON (%)</th>
+                      <th className="px-2 py-3 font-bold text-white uppercase tracking-wider text-center bg-[#007a7a]">COMPARISON (%)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
