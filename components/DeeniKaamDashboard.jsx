@@ -6,20 +6,10 @@ import * as XLSX from "xlsx";
 import pptxgen from "pptxgenjs";
 import html2canvas from "html2canvas";
 
-// OneDrive / SharePoint Direct CSV Link mapping
-const getDirectOneDriveUrl = (url) => {
-  if (!url) return "";
-  if (url.includes("sharepoint.com") || url.includes("1drv.ms")) {
-    // Convert SharePoint view link to download link if needed
-    if (!url.includes("download=1")) {
-      return url.includes("?") ? `${url}&download=1` : `${url}?download=1`;
-    }
-  }
-  return url;
-};
-
-const ONEDRIVE_SHEET_URLS = [
-  getDirectOneDriveUrl("https://dawateislamihindnet-my.sharepoint.com/:x:/g/personal/officehind_dawateislamiindia_org/IQAOT3wd7ly4RYf54jRLNz3PAWGoX1nmQr6UYYveHeeKim0?e=HRstwW")
+const SHEET_URLS = [
+  "https://docs.google.com/spreadsheets/d/1P1Ul-jXOfFfhuQLTKeQ-zOynKnCmywH-_gjZ9nJ8tO0/export?format=csv",
+  "https://docs.google.com/spreadsheets/d/1S2tEIyaN8p-yu4Vd_GVumqBqwzgTzM3zlms4DwCJr00/export?format=csv",
+  "https://docs.google.com/spreadsheets/d/1yWVgL9IVGrQFElLNeO8X_UGAIDSAGF7P8M31gGtoki8/export?format=csv"
 ];
 
 const parseSheet = (url) => {
@@ -153,7 +143,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     setLoading(true);
     setFetchError("");
     try {
-      const resultsArray = await Promise.all(ONEDRIVE_SHEET_URLS.map(url => parseSheet(url)));
+      const resultsArray = await Promise.all(SHEET_URLS.map(url => parseSheet(url)));
       const combinedData = resultsArray.flat().filter(Boolean);
       if (combinedData.length > 0) {
         const processed = combinedData.map(row => {
@@ -170,11 +160,11 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         }).filter(Boolean);
         setRawData(processed);
       } else {
-        setFetchError("Data stream empty or OneDrive connection blocked by CORS.");
+        setFetchError("Data stream empty.");
       }
       setLoading(false);
     } catch (err) {
-      setFetchError("Network or OneDrive synchronization issue.");
+      setFetchError("Network latency issue.");
       setLoading(false);
     }
   };
@@ -202,6 +192,25 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     }
     return uniqValues(subset, "Fileds");
   }, [rawData, selectedCategory]);
+
+  // Ultra-Fast Fast Lookup Map Builder for O(1) matching instead of O(N) .find()
+  const lookupMap = useMemo(() => {
+    const map = {};
+    if (Array.isArray(rawData)) {
+      rawData.forEach(r => {
+        if (!r) return;
+        const reg = String(r["Region"] || "").trim().toLowerCase();
+        const st = String(r["State"] || "").trim().toLowerCase();
+        const div = String(r["Division"] || "").trim().toLowerCase();
+        const dist = String(r["District"] || "").trim().toLowerCase();
+        const fld = String(r["Fileds"] || r["Fields"] || r["Deeni Activities"] || "").trim().toLowerCase();
+        const mo = String(r.NormalizedMonth || "").trim();
+        const key = `${reg}|${st}|${div}|${dist}|${fld}|${mo}`;
+        map[key] = r.NumericReport || 0;
+      });
+    }
+    return map;
+  }, [rawData]);
 
   const processedTableData = useMemo(() => {
     if (!Array.isArray(rawData)) return [];
@@ -241,40 +250,24 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     });
 
     return Object.values(uniqueMap).map(row => {
-      const reg = row.Region;
-      const st = row.State;
-      const div = row.Division;
-      const dist = row.District;
-      const fld = row.Fileds;
+      const regKey = row.Region.toLowerCase();
+      const stKey = row.State.toLowerCase();
+      const divKey = row.Division.toLowerCase();
+      const distKey = row.District.toLowerCase();
+      const fldKey = row.Fileds.toLowerCase();
 
       let v1 = 0;
       if (startMonth) {
-        const matchRow1 = rawData.find(r => 
-          r && 
-          sameClient(r["Region"], reg) && 
-          sameClient(r["State"], st) && 
-          sameClient(r["Division"], div) && 
-          sameClient(r["District"], dist) && 
-          sameClient(r["Fileds"] || r["Fields"] || "", fld) && 
-          r.NormalizedMonth === startMonth
-        );
-        v1 = matchRow1 ? (matchRow1.NumericReport || 0) : 0;
+        const k1 = `${regKey}|${stKey}|${divKey}|${distKey}|${fldKey}|${startMonth}`;
+        v1 = lookupMap[k1] || 0;
       } else {
         v1 = row.NumericReport || 0;
       }
 
       let v2 = 0;
       if (endMonth) {
-        const matchRow2 = rawData.find(r => 
-          r && 
-          sameClient(r["Region"], reg) && 
-          sameClient(r["State"], st) && 
-          sameClient(r["Division"], div) && 
-          sameClient(r["District"], dist) && 
-          sameClient(r["Fileds"] || r["Fields"] || "", fld) && 
-          r.NormalizedMonth === endMonth
-        );
-        v2 = matchRow2 ? (matchRow2.NumericReport || 0) : 0;
+        const k2 = `${regKey}|${stKey}|${divKey}|${distKey}|${fldKey}|${endMonth}`;
+        v2 = lookupMap[k2] || 0;
       } else {
         v2 = row.NumericReport || 0;
       }
@@ -305,7 +298,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
         CalculatedComparison: compStr
       };
     });
-  }, [rawData, region, state, division, district, selectedCategory, selectedField, searchTerm, startMonth, endMonth, activeTab, activeViewMode]);
+  }, [rawData, region, state, division, district, selectedCategory, selectedField, searchTerm, startMonth, endMonth, activeTab, activeViewMode, lookupMap]);
 
   const pagedRows = useMemo(() => {
     if (!Array.isArray(processedTableData)) return [];
