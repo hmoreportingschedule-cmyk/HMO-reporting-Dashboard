@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useTransition } from "react";
 import Papa from "papaparse";
 import { LogOut, RefreshCw, Filter, Calendar, Search, Activity, ArrowLeft, Download, BookOpenCheck, Image as ImageIcon, Clock, LayoutDashboard, BarChart3, TrendingUp, Target } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -25,16 +25,6 @@ const parseSheet = (url) => {
 };
 
 const sameClient = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
-
-const groupCount = (data, key) => {
-  const map = {};
-  data.forEach(x => {
-      const k = (x[key] || "Unknown").trim();
-      const n = Number(String(x["Report Value"] || x.report || "0").replace(/,/g, ""));
-      map[k] = (map[k] || 0) + (isNaN(n) ? 0 : n);
-  });
-  return Object.keys(map).sort((a,b) => map[b] - map[a]).map(k => ({ label: k, count: map[k] }));
-};
 
 const uniqValues = (data, key) => {
   return [...new Set(data.map(x => String(x[key] || "").trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b));
@@ -87,7 +77,7 @@ const MiniTable = ({ title, data }) => (
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {data.length > 0 ? data.map((d, i) => (
+          {data.length > 0 ? data.slice(0, 15).map((d, i) => (
             <tr key={i} className="hover:bg-slate-50 transition-colors">
               <td className="py-2.5 px-4 text-slate-700">{d.label}</td>
               <td className="py-2.5 px-4 text-teal-700 font-bold text-right">{d.count.toLocaleString("en-IN")}</td>
@@ -103,6 +93,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [rawData, setRawData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState("");
+  const [isPending, startTransition] = useTransition();
 
   const [activeViewMode, setActiveViewMode] = useState("table"); 
   const [activeTab, setActiveTab] = useState("Monthly Report");
@@ -162,22 +153,6 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     }
   };
 
-  const handleSetRegion = (v) => {
-    setRegion(v);
-    if(!(officeUser?.state && officeUser.state.toLowerCase() !== "all")) setState("");
-    if(!(officeUser?.division && officeUser.division.toLowerCase() !== "all")) setDivision("");
-    if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
-  };
-  const handleSetState = (v) => {
-    setState(v);
-    if(!(officeUser?.division && officeUser.division.toLowerCase() !== "all")) setDivision("");
-    if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
-  };
-  const handleSetDivision = (v) => {
-    setDivision(v);
-    if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
-  };
-
   const availableFields = useMemo(() => {
     let subset = rawData;
     if (selectedCategory) {
@@ -186,6 +161,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return uniqValues(subset, "Fileds");
   }, [rawData, selectedCategory]);
 
+  // Optimized Non-Blocking Processing & Aggregation
   const processedTableData = useMemo(() => {
     const baseFiltered = rawData.filter((row) => {
       const matchRegion = !region || sameClient(row["Region"], region);
@@ -285,20 +261,23 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     });
   }, [rawData, region, state, division, district, selectedCategory, selectedField, searchTerm, startMonth, endMonth, activeTab, activeViewMode]);
 
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, region, state, division, district, selectedCategory, selectedField, startMonth, endMonth, activeTab, activeViewMode]);
-
   const pagedRows = useMemo(() => {
     const start = (currentPage - 1) * rowsPerPage;
     return processedTableData.slice(start, start + rowsPerPage);
   }, [processedTableData, currentPage]);
 
-  const { dynamicGraphData, dynamicGraphTitle } = useMemo(() => {
-    if (division) return { dynamicGraphData: groupCount(processedTableData, "District"), dynamicGraphTitle: "REPORTS BY DISTRICT" };
-    if (state) return { dynamicGraphData: groupCount(processedTableData, "Division"), dynamicGraphTitle: "REPORTS BY DIVISION" };
-    if (region) return { dynamicGraphData: groupCount(processedTableData, "State"), dynamicGraphTitle: "REPORTS BY STATE" };
-    return { dynamicGraphData: groupCount(processedTableData, "Region"), dynamicGraphTitle: "REPORTS BY REGION" };
+  const dynamicGraphData = useMemo(() => {
+    const key = division ? "District" : state ? "Division" : region ? "State" : "Region";
+    const map = {};
+    processedTableData.forEach(x => {
+      const k = (x[key] || "Unknown").trim();
+      const n = Number(x["Report Value"] || x.NumericReport || 0);
+      map[k] = (map[k] || 0) + (isNaN(n) ? 0 : n);
+    });
+    return Object.keys(map).sort((a,b) => map[b] - map[a]).map(k => ({ label: k, count: map[k] }));
   }, [processedTableData, region, state, division]);
 
+  const dynamicGraphTitle = division ? "REPORTS BY DISTRICT" : state ? "REPORTS BY DIVISION" : region ? "REPORTS BY STATE" : "REPORTS BY REGION";
   const maxDynamicCount = dynamicGraphData.length ? Math.max(...dynamicGraphData.map(d => d.count)) : 0;
 
   const downloadExcel = () => {
@@ -406,7 +385,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   return (
                     <button
                       key={btn.id}
-                      onClick={() => setActiveViewMode(btn.id)}
+                      onClick={() => startTransition(() => setActiveViewMode(btn.id))}
                       className={`p-5 rounded-2xl border text-left transition-all shadow-sm flex items-start gap-3.5 ${
                         isActive
                           ? "bg-[#0f4c47] text-white border-[#0f4c47] shadow-md transform -translate-y-0.5"
@@ -430,7 +409,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   {["Monthly Report", "Average Report", "Quarterly Report"].map((tab) => (
                     <button
                       key={tab}
-                      onClick={() => setActiveTab(tab)}
+                      onClick={() => startTransition(() => setActiveTab(tab))}
                       className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm ${
                         activeTab === tab
                           ? "bg-teal-700 text-white shadow-md"
