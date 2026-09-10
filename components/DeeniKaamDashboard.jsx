@@ -12,20 +12,19 @@ const SHEET_URLS = [
   "https://docs.google.com/spreadsheets/d/1yWVgL9IVGrQFElLNeO8X_UGAIDSAGF7P8M31gGtoki8/export?format=csv"
 ];
 
-// Fallback mapping in case Google Sheet is missing 'Deeni Kaam' column
 const FIELD_TO_DEENIKAAM_MAP = {
-  "Total Active Muballigh": "Tanzimi Malumat",
-  "Total Moallimin": "Tanzimi Malumat",
-  "Total Masjid": "Tanzimi Malumat",
-  "Apni Masjid": "Tanzimi Malumat",
-  "Total Zeili Halqe": "Tanzimi Malumat",
-  "Total Zaili Halqe Taqarrur": "Tanzimi Malumat",
-  "Fajr Ke Liye Jagaen": "Fajr Ke Liye Jagaen",
-  "Tafseer Sunna/Sunnana": "Tafseer Sunna/Sunnana",
-  "Masjid Dars": "Dars",
-  "Area Dars": "Dars",
-  "Ghar Dars": "Dars",
-  "Total Dars": "Dars"
+  "Total Active Muballigh": { category: "Basic", deeniKaam: "Tanzimi Malumat" },
+  "Total Moallimin": { category: "Basic", deeniKaam: "Tanzimi Malumat" },
+  "Total Masjid": { category: "Basic", deeniKaam: "Tanzimi Malumat" },
+  "Apni Masjid": { category: "Basic", deeniKaam: "Tanzimi Malumat" },
+  "Total Zeili Halqe": { category: "Basic", deeniKaam: "Tanzimi Malumat" },
+  "Total Zaili Halqe Taqarrur": { category: "Basic", deeniKaam: "Tanzimi Malumat" },
+  "Fajr Ke Liye Jagaen": { category: "Daily", deeniKaam: "Fajr Ke Liye Jagaen" },
+  "Tafseer Sunna/Sunnana": { category: "Daily", deeniKaam: "Tafseer Sunna/Sunnana" },
+  "Masjid Dars": { category: "Daily", deeniKaam: "Dars" },
+  "Area Dars": { category: "Daily", deeniKaam: "Dars" },
+  "Ghar Dars": { category: "Daily", deeniKaam: "Dars" },
+  "Total Dars": { category: "Daily", deeniKaam: "Dars" }
 };
 
 const parseSheet = (url) => {
@@ -136,7 +135,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [division, setDivision] = useState(officeUser?.division && officeUser.division.toLowerCase() !== "all" ? officeUser.division : "");
   const [district, setDistrict] = useState(officeUser?.district && officeUser.district.toLowerCase() !== "all" ? officeUser.district : "");
   
-  // New Filters
+  // Filters: Category, Deeni Kaam, Fields, Targets
+  const [selectedCategory, setSelectedCategory] = useState(""); 
   const [selectedDeeniKaam, setSelectedDeeniKaam] = useState(""); 
   const [selectedField, setSelectedField] = useState(""); 
   const [selectedTargetPct, setSelectedTargetPct] = useState(""); 
@@ -170,9 +170,12 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
           let reportVal = Number(String(row["Report Value"] || row.report || "0").replace(/,/g, ""));
           let targetVal = Number(String(row["Target"] || "0").replace(/,/g, ""));
           let fld = String(row["Fileds"] || row["Fields"] || row["Deeni Activities"] || "").trim();
-          let dk = String(row["Deeni Kaam"] || row["Category"] || FIELD_TO_DEENIKAAM_MAP[fld] || "Other").trim();
+          let mapping = FIELD_TO_DEENIKAAM_MAP[fld] || {};
+          let cat = String(row["Category"] || mapping.category || "Basic").trim();
+          let dk = String(row["Deeni Kaam"] || mapping.deeniKaam || "Tanzimi Malumat").trim();
           return {
             ...row,
+            "Category": cat,
             "Deeni Kaam": dk,
             "Fileds": fld,
             Target: isNaN(targetVal) ? 0 : targetVal,
@@ -208,12 +211,21 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
   };
 
-  // Dynamic Deeni Kaam list
-  const availableDeeniKaam = useMemo(() => {
-    return uniqValues(rawData, "Deeni Kaam");
+  // Dynamic Categories
+  const availableCategories = useMemo(() => {
+    return uniqValues(rawData, "Category");
   }, [rawData]);
 
-  // Dynamic Fields list filtered by selected Deeni Kaam
+  // Dynamic Deeni Kaam filtered by Category
+  const availableDeeniKaam = useMemo(() => {
+    let subset = rawData;
+    if (selectedCategory) {
+      subset = rawData.filter(x => sameClient(x?.["Category"], selectedCategory));
+    }
+    return uniqValues(subset, "Deeni Kaam");
+  }, [rawData, selectedCategory]);
+
+  // Dynamic Fields filtered by Deeni Kaam
   const availableFields = useMemo(() => {
     let subset = rawData;
     if (selectedDeeniKaam) {
@@ -232,6 +244,9 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       const matchDivision = !division || sameClient(row["Division"], division);
       const matchDistrict = !district || sameClient(row["District"], district);
       
+      const catVal = row["Category"] || "";
+      const matchCat = !selectedCategory || sameClient(catVal, selectedCategory);
+
       const deeniKaamVal = row["Deeni Kaam"] || "";
       const matchDeeniKaam = !selectedDeeniKaam || sameClient(deeniKaamVal, selectedDeeniKaam);
 
@@ -239,7 +254,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       const matchField = !selectedField || sameClient(fieldVal, selectedField);
 
       const matchSearch = !searchTerm || JSON.stringify(row).toLowerCase().includes(searchTerm.toLowerCase().trim());
-      return matchRegion && matchState && matchDivision && matchDistrict && matchDeeniKaam && matchField && matchSearch;
+      return matchRegion && matchState && matchDivision && matchDistrict && matchCat && matchDeeniKaam && matchField && matchSearch;
     });
 
     const getLeftColName = (r) => {
@@ -335,7 +350,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     });
 
     return Object.values(aggregatedMap);
-  }, [rawData, region, state, division, district, selectedDeeniKaam, selectedField, selectedTargetPct, searchTerm, startMonth, endMonth, activeTab, activeViewMode]);
+  }, [rawData, region, state, division, district, selectedCategory, selectedDeeniKaam, selectedField, selectedTargetPct, searchTerm, startMonth, endMonth, activeTab, activeViewMode]);
 
   const pagedRows = useMemo(() => {
     if (!Array.isArray(processedTableData)) return [];
@@ -521,13 +536,22 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-8 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-9 gap-3">
                   <div className="col-span-2 md:col-span-1" data-html2canvas-ignore="true">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Search</label>
                     <div className="relative">
                       <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><Search className="w-4 h-4" /></span>
                       <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500" />
                     </div>
+                  </div>
+
+                  {/* Category Filter */}
+                  <div className="flex flex-col flex-1 min-w-[120px]">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Category</label>
+                    <select value={selectedCategory} onChange={(e) => { setSelectedCategory(e.target.value); setSelectedDeeniKaam(""); setSelectedField(""); }} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
+                      <option value="">All Categories</option>
+                      {availableCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
                   </div>
 
                   {/* Deeni Kaam Filter */}
@@ -549,7 +573,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                   </div>
 
                   {/* Targets Filter (26% / 52%) */}
-                  <div className="flex flex-col flex-1 min-w-[100px]">
+                  <div className="flex flex-col flex-1 min-w-[90px]">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Targets</label>
                     <select value={selectedTargetPct} onChange={(e) => setSelectedTargetPct(e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer">
                       <option value="">Standard</option>
@@ -564,7 +588,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     { label: "Division", val: division, set: handleSetDivision, opts: uniqValues(rawData.filter(x=>(!region||sameClient(x["Region"],region))&&(!state||sameClient(x["State"],state))), "Division") },
                     { label: "District", val: district, set: setDistrict, opts: uniqValues(rawData.filter(x=>(!region||sameClient(x["Region"],region))&&(!state||sameClient(x["State"],state))&&(!division||sameClient(x["Division"],division))), "District") }
                   ].map((f, i) => (
-                    <div key={i} className="flex flex-col flex-1 min-w-[130px]">
+                    <div key={i} className="flex flex-col flex-1 min-w-[120px]">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{f.label}</label>
                       <select value={f.val} onChange={(e) => f.set(e.target.value)} disabled={officeUser?.[f.label.toLowerCase()] && officeUser[f.label.toLowerCase()].toLowerCase() !== "all"} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer disabled:bg-slate-50 disabled:text-slate-400">
                         <option value="">{f.val || "All"}</option>
