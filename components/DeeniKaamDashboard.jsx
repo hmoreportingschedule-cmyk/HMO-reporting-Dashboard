@@ -60,12 +60,15 @@ const MASTER_CATEGORIES_MAP = [
   { category: "Monthly", deeniKaam: "Neak Aamal", field: "Neak Aamal Risala Wasool" }
 ];
 
+
 const parseSheet = (url) => {
   return new Promise((resolve) => {
     Papa.parse(url, {
       download: true,
       header: true,
       skipEmptyLines: true,
+      worker: true,
+      dynamicTyping: false,
       complete: (results) => resolve(results?.data || []),
       error: () => resolve([])
     });
@@ -74,57 +77,75 @@ const parseSheet = (url) => {
 
 const sameClient = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
+const toNumber = (value) => {
+  const n = Number(String(value ?? "").replace(/,/g, "").replace(/%/g, "").trim());
+  return Number.isFinite(n) ? n : 0;
+};
+
+const clean = (value) => String(value ?? "").trim();
+
 const groupCount = (data = [], key) => {
-  if (!Array.isArray(data)) return [];
-  const map = {};
-  data.forEach(x => {
-      if (!x) return;
-      const k = String(x[key] || "Unknown").trim();
-      const n = Number(String(x["Report Value"] || x.report || "0").replace(/,/g, ""));
-      map[k] = (map[k] || 0) + (isNaN(n) ? 0 : n);
-  });
-  return Object.keys(map).sort((a,b) => map[b] - map[a]).map(k => ({ label: k, count: map[k] }));
+  const map = new Map();
+  for (const x of data) {
+    const k = clean(x?.[key]) || "Unknown";
+    map.set(k, (map.get(k) || 0) + toNumber(x?.NumericReport));
+  }
+  return [...map.entries()].sort((a,b) => b[1] - a[1]).map(([label, count]) => ({ label, count }));
 };
 
 const uniqValues = (data = [], key) => {
-  if (!Array.isArray(data)) return [];
-  return [...new Set(data.map(x => String(x?.[key] || "").trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+  const set = new Set();
+  for (const x of data) {
+    const v = clean(x?.[key]);
+    if (v) set.add(v);
+  }
+  return [...set].sort((a,b) => a.localeCompare(b));
 };
 
 const formatMonthYearLabel = (val) => {
   if (!val) return "Month";
-  const parts = val.split("-");
+  const parts = String(val).split("-");
   if (parts.length < 2) return val;
-  const [year, month] = parts;
-  const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
-  return isNaN(date.getTime()) ? val : date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+  const date = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, 1);
+  return Number.isNaN(date.getTime()) ? val : date.toLocaleString("en-US", { month: "short", year: "numeric" });
 };
 
 const parseRowMonth = (row) => {
   if (!row) return "";
-  let raw = String(row["Month"] || row["Date"] || row["Report Date"] || "").trim();
-  if (!raw) return "";
-  if (/^\d{4}-\d{2}$/.test(raw)) return raw;
+  const direct = clean(row["NormalizedMonth"] || row["Year_Month"]);
+  if (/^\d{4}-\d{2}$/.test(direct)) return direct;
 
-  let parsed = Date.parse(raw);
-  if (!isNaN(parsed)) {
-    let d = new Date(parsed);
-    let yr = d.getFullYear();
-    let mo = String(d.getMonth() + 1).padStart(2, '0');
-    return `${yr}-${mo}`;
+  const yearRaw = clean(row["Year"]);
+  const monthRaw = clean(row["Month"] || row["Date"] || row["Report Date"] || row["Report_Date"]);
+  if (/^\d{4}-\d{2}$/.test(monthRaw)) return monthRaw;
+
+  if (yearRaw && /^\d{4}$/.test(yearRaw) && monthRaw) {
+    const monthNames = {january:"01",february:"02",march:"03",april:"04",may:"05",june:"06",july:"07",august:"08",september:"09",october:"10",november:"11",december:"12",jan:"01",feb:"02",mar:"03",apr:"04",jun:"06",jul:"07",aug:"08",sep:"09",oct:"10",nov:"11",dec:"12"};
+    if (monthNames[monthRaw.toLowerCase()]) return `${yearRaw}-${monthNames[monthRaw.toLowerCase()]}`;
   }
 
-  let lower = raw.toLowerCase();
-  const months = {jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'};
-  for (let m in months) {
-    if (lower.includes(m)) {
-      let matchYear = raw.match(/\d{4}/);
-      let yr = matchYear ? matchYear[0] : "2026";
-      return `${yr}-${months[m]}`;
-    }
+  const parsed = Date.parse(monthRaw);
+  if (!Number.isNaN(parsed)) {
+    const d = new Date(parsed);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   }
-  return raw;
+
+  const matchYear = monthRaw.match(/\d{4}/);
+  const lower = monthRaw.toLowerCase();
+  const monthNames = {jan:"01",feb:"02",mar:"03",apr:"04",may:"05",jun:"06",jul:"07",aug:"08",sep:"09",oct:"10",nov:"11",dec:"12"};
+  for (const m in monthNames) if (lower.includes(m)) return `${matchYear ? matchYear[0] : yearRaw || "2026"}-${monthNames[m]}`;
+  return "";
 };
+
+const getFieldValue = (row) => clean(row?.["Fields"] || row?.["Fileds"] || row?.["Field_Name"] || row?.["Deeni Activities"]);
+const getCategoryValue = (row) => clean(row?.["Category"]) || "Basic";
+const getReportValue = (row) => toNumber(row?.["Report Value"] ?? row?.["Report_Value"] ?? row?.report);
+const getTargetValue = (row, pct) => {
+  if (pct === "26%") return toNumber(row?.["Target 26% (Value)"] ?? row?.["Target 26%"] ?? row?.["Target_26Pct"]);
+  if (pct === "52%") return toNumber(row?.["Target 52% (Value)"] ?? row?.["Target 52%"] ?? row?.["Target_52Pct"]);
+  return 0;
+};
+
 
 const MiniTable = ({ title, data = [] }) => (
   <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[340px]">
@@ -191,40 +212,48 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   }, []);
 
   const fetchData = async () => {
+    if (loading) return;
     setLoading(true);
     setFetchError("");
     try {
       const resultsArray = await Promise.all(SHEET_URLS.map(url => parseSheet(url)));
       const combinedData = resultsArray.flat().filter(Boolean);
-      if (combinedData.length > 0) {
-        const processed = combinedData.map(row => {
-          if (!row) return null;
-          let reportVal = Number(String(row["Report Value"] || row.report || "0").replace(/,/g, ""));
-          let targetVal = Number(String(row["Target"] || "0").replace(/,/g, ""));
-          let fld = String(row["Fileds"] || row["Fields"] || row["Deeni Activities"] || "").trim();
-          
-          let foundMap = MASTER_CATEGORIES_MAP.find(m => sameClient(m.field, fld));
-          let cat = String(row["Category"] || foundMap?.category || "Basic").trim();
-          let dk = String(row["Deeni Kaam"] || foundMap?.deeniKaam || "Tanzimi Malumat").trim();
 
-          return {
-            ...row,
-            "Category": cat,
-            "Deeni Kaam": dk,
-            "Fileds": fld,
-            Target: isNaN(targetVal) ? 0 : targetVal,
-            Achievement: Number(String(row["Achievement"] || row["Achivement"] || "0").replace(/,/g, "")),
-            NormalizedMonth: parseRowMonth(row),
-            NumericReport: isNaN(reportVal) ? 0 : reportVal
-          };
-        }).filter(Boolean);
-        setRawData(processed);
-      } else {
+      if (!combinedData.length) {
+        setRawData([]);
         setFetchError("Data stream empty.");
+        return;
       }
-      setLoading(false);
+
+      const processed = combinedData.map((row, index) => {
+        const reportVal = getReportValue(row);
+        const normalizedMonth = parseRowMonth(row);
+        const field = getFieldValue(row);
+        const deeniKaam = clean(row?.["Deeni Kaam"]);
+
+        return {
+          ...row,
+          Category: getCategoryValue(row),
+          "Deeni Kaam": deeniKaam,
+          Fields: field,
+          Fileds: field,
+          NumericReport: reportVal,
+          Target26: getTargetValue(row, "26%"),
+          Target52: getTargetValue(row, "52%"),
+          NormalizedMonth: normalizedMonth,
+          _search: `${field} ${deeniKaam} ${clean(row?.Category)} ${clean(row?.Region)} ${clean(row?.State)} ${clean(row?.Division)} ${clean(row?.District)} ${clean(row?.Department)} ${clean(row?.["Multiple Field Name"])} ${clean(row?.["Multiple Field Value"])}`.toLowerCase(),
+          _rowId: `${normalizedMonth}|${field}|${index}`
+        };
+      }).filter(row => row.Fields || row.NumericReport || row.NormalizedMonth);
+
+      processed.sort((a,b) => String(b.NormalizedMonth).localeCompare(String(a.NormalizedMonth)));
+      setRawData(processed);
+      setCurrentPage(1);
     } catch (err) {
-      setFetchError("Network latency issue.");
+      console.error(err);
+      setFetchError("Unable to sync Google Sheet data. Please check the published CSV URLs.");
+      setRawData([]);
+    } finally {
       setLoading(false);
     }
   };
@@ -245,25 +274,20 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
   };
 
-  const availableCategories = useMemo(() => {
-    return [...new Set(MASTER_CATEGORIES_MAP.map(m => m.category))].sort();
-  }, []);
-
-  const availableDeeniKaam = useMemo(() => {
-    let subset = MASTER_CATEGORIES_MAP;
-    if (selectedCategory) {
-      subset = MASTER_CATEGORIES_MAP.filter(m => sameClient(m.category, selectedCategory));
-    }
-    return [...new Set(subset.map(m => m.deeniKaam))].sort();
-  }, [selectedCategory]);
+  const availableCategories = useMemo(() => uniqValues(rawData, "Category"), [rawData]);
 
   const availableFields = useMemo(() => {
-    let subset = MASTER_CATEGORIES_MAP;
-    if (selectedDeeniKaam) {
-      subset = MASTER_CATEGORIES_MAP.filter(m => sameClient(m.deeniKaam, selectedDeeniKaam));
-    }
-    return [...new Set(subset.map(m => m.field))].sort();
-  }, [selectedDeeniKaam]);
+    let subset = rawData;
+    if (selectedCategory) subset = subset.filter(r => sameClient(r.Category, selectedCategory));
+    return uniqValues(subset, "Fields");
+  }, [rawData, selectedCategory]);
+
+  // Backward compatible: older URLs may still contain a Deeni Kaam column.
+  const availableDeeniKaam = useMemo(() => {
+    let subset = rawData;
+    if (selectedCategory) subset = subset.filter(r => sameClient(r.Category, selectedCategory));
+    return uniqValues(subset, "Deeni Kaam");
+  }, [rawData, selectedCategory]);
 
   const leftHeaderTitle = useMemo(() => {
     if (district) return "";
@@ -274,132 +298,101 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   }, [region, state, division, district]);
 
   const processedTableData = useMemo(() => {
-    if (!Array.isArray(rawData)) return [];
-    
-    // Determine target month (default to startMonth or endMonth or latest available in rawData)
-    const activeMonth = endMonth || startMonth || (rawData.length > 0 ? rawData[0].NormalizedMonth : "");
+    if (!rawData.length) return [];
 
-    const baseFiltered = rawData.filter((row) => {
-      if (!row) return false;
-      const matchRegion = !region || sameClient(row["Region"], region);
-      const matchState = !state || sameClient(row["State"], state);
-      const matchDivision = !division || sameClient(row["Division"], division);
-      const matchDistrict = !district || sameClient(row["District"], district);
-      
-      const catVal = row["Category"] || "";
-      const matchCat = !selectedCategory || sameClient(catVal, selectedCategory);
+    const latestMonth = rawData.find(r => r.NormalizedMonth)?.NormalizedMonth || "";
+    const activeMonth = endMonth || startMonth || latestMonth;
 
-      const deeniKaamVal = row["Deeni Kaam"] || "";
-      const matchDeeniKaam = !selectedDeeniKaam || sameClient(deeniKaamVal, selectedDeeniKaam);
+    const passes = (row, includeMonth = true) => {
+      if (region && !sameClient(row.Region, region)) return false;
+      if (state && !sameClient(row.State, state)) return false;
+      if (division && !sameClient(row.Division, division)) return false;
+      if (district && !sameClient(row.District, district)) return false;
+      if (selectedCategory && !sameClient(row.Category, selectedCategory)) return false;
+      if (selectedDeeniKaam && !sameClient(row["Deeni Kaam"], selectedDeeniKaam)) return false;
+      if (selectedField && !sameClient(row.Fields, selectedField)) return false;
+      if (includeMonth && activeMonth && row.NormalizedMonth !== activeMonth) return false;
+      if (searchTerm && !row._search.includes(searchTerm.trim().toLowerCase())) return false;
+      return true;
+    };
 
-      const fieldVal = row["Fileds"] || "";
-      const matchField = !selectedField || sameClient(fieldVal, selectedField);
+    const baseFiltered = rawData.filter(row => passes(row, true));
 
-      // Strict Month matching for active view
-      const matchMonth = !activeMonth || row.NormalizedMonth === activeMonth;
-
-      const matchSearch = !searchTerm || JSON.stringify(row).toLowerCase().includes(searchTerm.toLowerCase().trim());
-      return matchRegion && matchState && matchDivision && matchDistrict && matchCat && matchDeeniKaam && matchField && matchMonth && matchSearch;
-    });
-
-    const getLeftColName = (r) => {
+    const leftName = (r) => {
       if (district) return "";
-      if (division) return r["District"] || "-";
-      if (state) return r["Division"] || "-";
-      if (region) return r["State"] || "-";
-      return "India";
+      if (division) return clean(r.District) || "-";
+      if (state) return clean(r.Division) || "-";
+      if (region) return clean(r.State) || "-";
+      return clean(r.Region) || "India";
     };
 
-    const getAggregatedValForMonth = (targetMo, groupKeyFilter, subFilterName, isTargetOrAch = false) => {
-      let totalRep = 0;
-      let totalTarget = 0;
+    // Single-pass index: avoids repeatedly scanning hundreds of thousands of rows.
+    const index = new Map();
+    for (const r of rawData) {
+      if (!passes(r, false)) continue;
+      const month = r.NormalizedMonth;
+      const field = r.Fields || "-";
+      const dk = r["Deeni Kaam"] || "";
+      const left = leftName(r);
+      const key = `${month}|${left}|${dk}|${field}`;
+      if (!index.has(key)) index.set(key, { report: 0, target26: 0, target52: 0 });
+      const item = index.get(key);
+      item.report += r.NumericReport;
+      item.target26 += r.Target26;
+      item.target52 += r.Target52;
+    }
 
-      rawData.forEach(r => {
-        if (!r) return;
-        const mo = r.NormalizedMonth || "";
-        if (targetMo && mo !== targetMo) return;
+    const getIndexed = (month, left, dk, field) =>
+      index.get(`${month}|${left}|${dk}|${field}`) || { report: 0, target26: 0, target52: 0 };
 
-        // Apply geographic filters
-        if (region && !sameClient(r["Region"], region)) return;
-        if (state && !sameClient(r["State"], state)) return;
-        if (division && !sameClient(r["Division"], division)) return;
-        if (district && !sameClient(r["District"], district)) return;
+    const rows = [];
+    const seen = new Set();
 
-        const fld = String(r["Fileds"] || "").trim();
-        let matchesGroup = false;
+    for (const r of baseFiltered) {
+      const left = leftName(r);
+      const dk = r["Deeni Kaam"] || "";
+      const field = r.Fields || "-";
+      const rowKey = `${left}|${dk}|${field}`;
+      if (seen.has(rowKey)) continue;
+      seen.add(rowKey);
 
-        if (district) matchesGroup = fld === groupKeyFilter;
-        else if (division) matchesGroup = String(r["District"] || "").trim() === subFilterName && fld === groupKeyFilter;
-        else if (state) matchesGroup = String(r["Division"] || "").trim() === subFilterName && fld === groupKeyFilter;
-        else if (region) matchesGroup = String(r["State"] || "").trim() === subFilterName && fld === groupKeyFilter;
-        else matchesGroup = fld === groupKeyFilter;
+      const current = getIndexed(activeMonth, left, dk, field);
+      const first = startMonth ? getIndexed(startMonth, left, dk, field).report : current.report;
+      const second = endMonth ? getIndexed(endMonth, left, dk, field).report : current.report;
 
-        if (matchesGroup) {
-          totalRep += r.NumericReport || 0;
-          let baseTarget = r.Target || 0;
-          if (selectedTargetPct === "26%") baseTarget = baseTarget * 0.26;
-          else if (selectedTargetPct === "52%") baseTarget = baseTarget * 0.52;
-          totalTarget += baseTarget;
-        }
+      let comparison = 0;
+      if (first > 0) comparison = ((second - first) / first) * 100;
+      else if (second > 0) comparison = 100;
+
+      const target = selectedTargetPct === "26%" ? current.target26 : selectedTargetPct === "52%" ? current.target52 : 0;
+      const achievement = target > 0 ? (current.report / target) * 100 : null;
+
+      rows.push({
+        LeftColValue: left,
+        DeeniKaamName: dk || "-",
+        DeeniActivity: field,
+        DynamicMonthDisplay: formatMonthYearLabel(activeMonth),
+        DynamicReportValue: current.report,
+        Target26: current.target26,
+        Target52: current.target52,
+        DynamicTarget: target,
+        DynamicAchievement: achievement === null ? "-" : `${achievement.toFixed(1)}%`,
+        Val1: first,
+        Val2: second,
+        CalculatedComparison: `${comparison >= 0 ? "+" : ""}${comparison.toFixed(1)}%`
       });
+    }
 
-      if (isTargetOrAch) {
-        return { target: Math.round(totalTarget), report: totalRep };
-      }
-      return totalRep;
-    };
-
-    const aggregatedMap = {};
-    baseFiltered.forEach(row => {
-      if (!row) return;
-      const fld = String(row["Fileds"] || "").trim();
-      const dkName = String(row["Deeni Kaam"] || "").trim();
-      const leftVal = getLeftColName(row);
-      const compositeKey = `${leftVal}|${dkName}|${fld}`;
-
-      if (!aggregatedMap[compositeKey]) {
-        const curRep = row.NumericReport || 0;
-        const targetAchObj = { target: row.Target || 0, report: curRep };
-
-        let v1 = startMonth ? getAggregatedValForMonth(startMonth, fld, leftVal) : curRep;
-        let v2 = endMonth ? getAggregatedValForMonth(endMonth, fld, leftVal) : curRep;
-
-        if (activeTab === "Average Report" || activeViewMode === "average") {
-          v1 = Math.round(v1 / 2);
-          v2 = Math.round(v2 / 2);
-        } else if (activeTab === "Quarterly Report") {
-          v1 = v1 * 3;
-          v2 = v2 * 3;
-        }
-
-        let diffPercent = 0;
-        if (v1 > 0) {
-          diffPercent = ((v2 - v1) / v1) * 100;
-        } else if (v1 === 0 && v2 > 0) {
-          diffPercent = 100;
-        } else if (v1 > 0 && v2 === 0) {
-          diffPercent = -100;
-        }
-
-        let compStr = `${diffPercent >= 0 ? "+" : ""}${diffPercent.toFixed(1)}%`;
-
-        aggregatedMap[compositeKey] = {
-          LeftColValue: leftVal,
-          DeeniKaamName: dkName,
-          DeeniActivity: fld,
-          DynamicMonthDisplay: formatMonthYearLabel(activeMonth),
-          DynamicReportValue: curRep,
-          DynamicTarget: targetAchObj.target,
-          DynamicAchievement: targetAchObj.target > 0 ? ((curRep / targetAchObj.target) * 100).toFixed(1) + "%" : "-",
-          Val1: v1,
-          Val2: v2,
-          CalculatedComparison: compStr
-        };
-      }
-    });
-
-    return Object.values(aggregatedMap);
+    return rows.sort((a,b) =>
+      `${a.LeftColValue}|${a.DeeniKaamName}|${a.DeeniActivity}`.localeCompare(
+        `${b.LeftColValue}|${b.DeeniKaamName}|${b.DeeniActivity}`
+      )
+    );
   }, [rawData, region, state, division, district, selectedCategory, selectedDeeniKaam, selectedField, selectedTargetPct, searchTerm, startMonth, endMonth, activeTab, activeViewMode]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [region, state, division, district, selectedCategory, selectedDeeniKaam, selectedField, selectedTargetPct, searchTerm, startMonth, endMonth, activeTab, activeViewMode]);
 
   const pagedRows = useMemo(() => {
     if (!Array.isArray(processedTableData)) return [];
