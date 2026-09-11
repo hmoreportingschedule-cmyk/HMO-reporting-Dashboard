@@ -41,7 +41,7 @@ const MASTER_CATEGORIES_MAP = [
   { category: "Weekly", deeniKaam: "Ek Din Raahe Khuda Me", field: "Ek Din Raahe Khuda Me Shurqa" },
   { category: "Weekly", deeniKaam: "Madani Halqa", field: "Madani Halqa Tadad" },
   { category: "Weekly", deeniKaam: "Madani Halqa", field: "Madani Halqa Shurqa" },
-  { category: "Weekly", deeniKaam: "Haftwar Risala", field: "Haftwar Risala Padhne Wale / Sunne Wale" },
+  { category: "Weekly", deeniKaam: "Haftawar Risala ", field: "Haftwar Risala Padhne Wale / Sunne Wale" },
   { category: "Weekly", deeniKaam: "Alaqai Dora", field: "Alaqai Dora Kitni Baar" },
   { category: "Monthly", deeniKaam: "Qafila", field: "3 Din Qafila Tadad" },
   { category: "Monthly", deeniKaam: "Qafila", field: "3 Din Qafila Shurqa" },
@@ -60,92 +60,161 @@ const MASTER_CATEGORIES_MAP = [
   { category: "Monthly", deeniKaam: "Neak Aamal", field: "Neak Aamal Risala Wasool" }
 ];
 
-
 const parseSheet = (url) => {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     Papa.parse(url, {
       download: true,
       header: true,
       skipEmptyLines: true,
       worker: true,
-      dynamicTyping: false,
       complete: (results) => resolve(results?.data || []),
-      error: () => resolve([])
+      error: (err) => reject(err)
     });
   });
 };
 
-const sameClient = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+const sameClient = (a, b) =>
+  String(a ?? "").trim().toLowerCase() === String(b ?? "").trim().toLowerCase();
 
-const toNumber = (value) => {
-  const n = Number(String(value ?? "").replace(/,/g, "").replace(/%/g, "").trim());
+const cleanText = (v) => String(v ?? "").trim();
+
+const toNumber = (v) => {
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  const n = Number(String(v ?? "0").replace(/,/g, "").replace(/%/g, "").trim());
   return Number.isFinite(n) ? n : 0;
 };
 
-const clean = (value) => String(value ?? "").trim();
-
-const groupCount = (data = [], key) => {
-  const map = new Map();
-  for (const x of data) {
-    const k = clean(x?.[key]) || "Unknown";
-    map.set(k, (map.get(k) || 0) + toNumber(x?.NumericReport));
+const getFirst = (row, keys) => {
+  for (const key of keys) {
+    if (row && row[key] !== undefined && row[key] !== null && cleanText(row[key]) !== "") {
+      return row[key];
+    }
   }
-  return [...map.entries()].sort((a,b) => b[1] - a[1]).map(([label, count]) => ({ label, count }));
+  return "";
 };
 
-const uniqValues = (data = [], key) => {
-  const set = new Set();
-  for (const x of data) {
-    const v = clean(x?.[key]);
-    if (v) set.add(v);
-  }
-  return [...set].sort((a,b) => a.localeCompare(b));
+const MONTH_NUMBERS = {
+  january: "01", jan: "01", february: "02", feb: "02", march: "03", mar: "03",
+  april: "04", apr: "04", may: "05", june: "06", jun: "06", july: "07", jul: "07",
+  august: "08", aug: "08", september: "09", sep: "09", sept: "09", october: "10",
+  oct: "10", november: "11", nov: "11", december: "12", dec: "12"
 };
 
-const formatMonthYearLabel = (val) => {
-  if (!val) return "Month";
-  const parts = String(val).split("-");
-  if (parts.length < 2) return val;
-  const date = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, 1);
-  return Number.isNaN(date.getTime()) ? val : date.toLocaleString("en-US", { month: "short", year: "numeric" });
-};
+const normalizeMonth = (row) => {
+  const monthRaw = cleanText(getFirst(row, ["Month", "month", "Report Month", "Month_Name"]));
+  const yearRaw = cleanText(getFirst(row, ["Year", "year", "Report Year"]));
 
-const parseRowMonth = (row) => {
-  if (!row) return "";
-  const direct = clean(row["NormalizedMonth"] || row["Year_Month"]);
-  if (/^\d{4}-\d{2}$/.test(direct)) return direct;
-
-  const yearRaw = clean(row["Year"]);
-  const monthRaw = clean(row["Month"] || row["Date"] || row["Report Date"] || row["Report_Date"]);
   if (/^\d{4}-\d{2}$/.test(monthRaw)) return monthRaw;
 
-  if (yearRaw && /^\d{4}$/.test(yearRaw) && monthRaw) {
-    const monthNames = {january:"01",february:"02",march:"03",april:"04",may:"05",june:"06",july:"07",august:"08",september:"09",october:"10",november:"11",december:"12",jan:"01",feb:"02",mar:"03",apr:"04",jun:"06",jul:"07",aug:"08",sep:"09",oct:"10",nov:"11",dec:"12"};
-    if (monthNames[monthRaw.toLowerCase()]) return `${yearRaw}-${monthNames[monthRaw.toLowerCase()]}`;
+  const combined = `${monthRaw} ${yearRaw}`.trim();
+  const yearMatch = combined.match(/(?:19|20)\d{2}/);
+  const year = yearMatch ? yearMatch[0] : "";
+
+  const numericMonth = combined.match(/\b(0?[1-9]|1[0-2])\b/);
+  if (year && numericMonth && !/[a-zA-Z]/.test(monthRaw)) {
+    return `${year}-${String(numericMonth[1]).padStart(2, "0")}`;
   }
 
-  const parsed = Date.parse(monthRaw);
+  const lower = combined.toLowerCase();
+  for (const name of Object.keys(MONTH_NUMBERS)) {
+    if (lower.includes(name)) {
+      const y = year || "2026";
+      return `${y}-${MONTH_NUMBERS[name]}`;
+    }
+  }
+
+  const parsed = Date.parse(combined);
   if (!Number.isNaN(parsed)) {
     const d = new Date(parsed);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   }
-
-  const matchYear = monthRaw.match(/\d{4}/);
-  const lower = monthRaw.toLowerCase();
-  const monthNames = {jan:"01",feb:"02",mar:"03",apr:"04",may:"05",jun:"06",jul:"07",aug:"08",sep:"09",oct:"10",nov:"11",dec:"12"};
-  for (const m in monthNames) if (lower.includes(m)) return `${matchYear ? matchYear[0] : yearRaw || "2026"}-${monthNames[m]}`;
   return "";
 };
 
-const getFieldValue = (row) => clean(row?.["Fields"] || row?.["Fileds"] || row?.["Field_Name"] || row?.["Deeni Activities"]);
-const getCategoryValue = (row) => clean(row?.["Category"]) || "Basic";
-const getReportValue = (row) => toNumber(row?.["Report Value"] ?? row?.["Report_Value"] ?? row?.report);
-const getTargetValue = (row, pct) => {
-  if (pct === "26%") return toNumber(row?.["Target 26% (Value)"] ?? row?.["Target 26%"] ?? row?.["Target_26Pct"]);
-  if (pct === "52%") return toNumber(row?.["Target 52% (Value)"] ?? row?.["Target 52%"] ?? row?.["Target_52Pct"]);
-  return 0;
+const formatMonthYearLabel = (val) => {
+  if (!val) return "Month";
+  const [year, month] = String(val).split("-");
+  if (!year || !month) return val;
+  const date = new Date(Number(year), Number(month) - 1, 1);
+  return Number.isNaN(date.getTime()) ? val :
+    date.toLocaleString("en-US", { month: "short", year: "numeric" });
 };
 
+const getPreviousMonth = (ym) => {
+  if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return "";
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(y, m - 2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
+
+const aggregateRows = (rows) => {
+  const map = new Map();
+
+  for (const row of rows || []) {
+    if (!row) continue;
+
+    const field = cleanText(getFirst(row, ["Fields", "Fileds", "Field", "Deeni Activities"]));
+    if (!field) continue;
+
+    const master = MASTER_CATEGORIES_MAP.find(m => sameClient(m.field, field));
+    const category = cleanText(getFirst(row, ["Category"])) || master?.category || "Basic";
+    const deeniKaam = cleanText(getFirst(row, ["Deeni Kaam", "DeeniKaam"])) || master?.deeniKaam || "";
+
+    const normalized = {
+      Month: normalizeMonth(row),
+      Chain: cleanText(getFirst(row, ["Chain"])),
+      Department: cleanText(getFirst(row, ["Department"])),
+      Region: cleanText(getFirst(row, ["Region"])),
+      State: cleanText(getFirst(row, ["State"])),
+      Division: cleanText(getFirst(row, ["Division"])),
+      District: cleanText(getFirst(row, ["District"])),
+      Category: category,
+      "Deeni Kaam": deeniKaam,
+      Fields: field,
+      "Multiple Field Name": cleanText(getFirst(row, ["Multiple Field Name", "Multiple_Field_Name"])),
+      "Multiple Field Value": cleanText(getFirst(row, ["Multiple Field Value", "Multiple_Field_Value"])),
+      Report: toNumber(getFirst(row, ["Report Value", "Report", "report"])),
+      Target26: toNumber(getFirst(row, ["Target 26% (Value)", "Target 26%", "Target26", "Target_26Pct"])),
+      Target52: toNumber(getFirst(row, ["Target 52% (Value)", "Target 52%", "Target52", "Target_52Pct"])),
+      Source: cleanText(getFirst(row, ["Source Report", "Source_File"])),
+      Notes: cleanText(getFirst(row, ["Notes"]))
+    };
+
+    if (!normalized.Month) continue;
+
+    const key = [
+      normalized.Month, normalized.Chain, normalized.Department,
+      normalized.Region, normalized.State, normalized.Division, normalized.District,
+      normalized.Category, normalized["Deeni Kaam"], normalized.Fields,
+      normalized["Multiple Field Name"], normalized["Multiple Field Value"]
+    ].map(cleanText).join("\u001F");
+
+    const old = map.get(key);
+    if (old) {
+      old.Report += normalized.Report;
+      old.Target26 += normalized.Target26;
+      old.Target52 += normalized.Target52;
+      if (!old.Source && normalized.Source) old.Source = normalized.Source;
+    } else {
+      map.set(key, { ...normalized });
+    }
+  }
+  return Array.from(map.values());
+};
+
+const groupCount = (data = [], key) => {
+  const map = new Map();
+  for (const x of data) {
+    const k = cleanText(x?.[key]) || "Unknown";
+    map.set(k, (map.get(k) || 0) + toNumber(x?.DynamicReportValue ?? x?.Report));
+  }
+  return Array.from(map, ([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count);
+};
+
+const uniqValues = (data = [], key) =>
+  [...new Set(data.map(x => cleanText(x?.[key])).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
 
 const MiniTable = ({ title, data = [] }) => (
   <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[340px]">
@@ -179,21 +248,21 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [fetchError, setFetchError] = useState("");
   const [, startTransition] = useTransition();
 
-  const [activeViewMode, setActiveViewMode] = useState("table"); 
+  const [activeViewMode, setActiveViewMode] = useState("table");
   const [activeTab, setActiveTab] = useState("Monthly Report");
   const [startMonth, setStartMonth] = useState("");
   const [endMonth, setEndMonth] = useState("");
-  
+
   const [region, setRegion] = useState(officeUser?.region && officeUser.region.toLowerCase() !== "all" ? officeUser.region : "");
   const [state, setState] = useState(officeUser?.state && officeUser.state.toLowerCase() !== "all" ? officeUser.state : "");
   const [division, setDivision] = useState(officeUser?.division && officeUser.division.toLowerCase() !== "all" ? officeUser.division : "");
   const [district, setDistrict] = useState(officeUser?.district && officeUser.district.toLowerCase() !== "all" ? officeUser.district : "");
-  
-  const [selectedCategory, setSelectedCategory] = useState(""); 
-  const [selectedDeeniKaam, setSelectedDeeniKaam] = useState(""); 
-  const [selectedField, setSelectedField] = useState(""); 
-  const [selectedTargetPct, setSelectedTargetPct] = useState(""); 
-  
+
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedDeeniKaam, setSelectedDeeniKaam] = useState("");
+  const [selectedField, setSelectedField] = useState("");
+  const [selectedTargetPct, setSelectedTargetPct] = useState("");
+
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
@@ -204,55 +273,33 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
-  const dateStr = now ? now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') : "";
-  const timeStr = now ? now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : "";
+  const dateStr = now ? now.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-") : "";
+  const timeStr = now ? now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }) : "";
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
-    if (loading) return;
     setLoading(true);
     setFetchError("");
     try {
-      const resultsArray = await Promise.all(SHEET_URLS.map(url => parseSheet(url)));
-      const combinedData = resultsArray.flat().filter(Boolean);
-
-      if (!combinedData.length) {
-        setRawData([]);
-        setFetchError("Data stream empty.");
-        return;
+      const allRows = [];
+      // Sequentially download large CSVs so the browser does not hold 3 full files at once.
+      for (const url of SHEET_URLS) {
+        const rows = await parseSheet(url);
+        allRows.push(...rows);
       }
-
-      const processed = combinedData.map((row, index) => {
-        const reportVal = getReportValue(row);
-        const normalizedMonth = parseRowMonth(row);
-        const field = getFieldValue(row);
-        const deeniKaam = clean(row?.["Deeni Kaam"]);
-
-        return {
-          ...row,
-          Category: getCategoryValue(row),
-          "Deeni Kaam": deeniKaam,
-          Fields: field,
-          Fileds: field,
-          NumericReport: reportVal,
-          Target26: getTargetValue(row, "26%"),
-          Target52: getTargetValue(row, "52%"),
-          NormalizedMonth: normalizedMonth,
-          _search: `${field} ${deeniKaam} ${clean(row?.Category)} ${clean(row?.Region)} ${clean(row?.State)} ${clean(row?.Division)} ${clean(row?.District)} ${clean(row?.Department)} ${clean(row?.["Multiple Field Name"])} ${clean(row?.["Multiple Field Value"])}`.toLowerCase(),
-          _rowId: `${normalizedMonth}|${field}|${index}`
-        };
-      }).filter(row => row.Fields || row.NumericReport || row.NormalizedMonth);
-
-      processed.sort((a,b) => String(b.NormalizedMonth).localeCompare(String(a.NormalizedMonth)));
-      setRawData(processed);
-      setCurrentPage(1);
+      const compact = aggregateRows(allRows);
+      if (compact.length) {
+        setRawData(compact);
+        setCurrentPage(1);
+      } else {
+        setRawData([]);
+        setFetchError("Google Sheet se valid data nahi mila. Month/Year aur Fields columns check karein.");
+      }
     } catch (err) {
       console.error(err);
-      setFetchError("Unable to sync Google Sheet data. Please check the published CSV URLs.");
       setRawData([]);
+      setFetchError("Google Sheet sync failed. Please check sharing permission and URL.");
     } finally {
       setLoading(false);
     }
@@ -274,20 +321,23 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     if(!(officeUser?.district && officeUser.district.toLowerCase() !== "all")) setDistrict("");
   };
 
-  const availableCategories = useMemo(() => uniqValues(rawData, "Category"), [rawData]);
+  const availableCategories = useMemo(() =>
+    [...new Set(MASTER_CATEGORIES_MAP.map(m => m.category))], []);
+
+  const availableDeeniKaam = useMemo(() => {
+    let subset = MASTER_CATEGORIES_MAP;
+    if (selectedCategory) subset = subset.filter(m => sameClient(m.category, selectedCategory));
+    return [...new Set(subset.map(m => m.deeniKaam).filter(Boolean))]
+      .sort((a,b) => a.localeCompare(b));
+  }, [selectedCategory]);
 
   const availableFields = useMemo(() => {
-    let subset = rawData;
-    if (selectedCategory) subset = subset.filter(r => sameClient(r.Category, selectedCategory));
-    return uniqValues(subset, "Fields");
-  }, [rawData, selectedCategory]);
-
-  // Backward compatible: older URLs may still contain a Deeni Kaam column.
-  const availableDeeniKaam = useMemo(() => {
-    let subset = rawData;
-    if (selectedCategory) subset = subset.filter(r => sameClient(r.Category, selectedCategory));
-    return uniqValues(subset, "Deeni Kaam");
-  }, [rawData, selectedCategory]);
+    let subset = MASTER_CATEGORIES_MAP;
+    if (selectedCategory) subset = subset.filter(m => sameClient(m.category, selectedCategory));
+    if (selectedDeeniKaam) subset = subset.filter(m => sameClient(m.deeniKaam, selectedDeeniKaam));
+    return [...new Set(subset.map(m => m.field).filter(Boolean))]
+      .sort((a,b) => a.localeCompare(b));
+  }, [selectedCategory, selectedDeeniKaam]);
 
   const leftHeaderTitle = useMemo(() => {
     if (district) return "";
@@ -297,125 +347,149 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     return "COUNTRY";
   }, [region, state, division, district]);
 
+  const selectedPeriod = endMonth || startMonth || "";
+  const comparisonPeriod = startMonth && endMonth && startMonth !== endMonth
+    ? startMonth
+    : getPreviousMonth(selectedPeriod);
+
+  const baseMatches = (row) => {
+    if (region && !sameClient(row.Region, region)) return false;
+    if (state && !sameClient(row.State, state)) return false;
+    if (division && !sameClient(row.Division, division)) return false;
+    if (district && !sameClient(row.District, district)) return false;
+    if (selectedCategory && !sameClient(row.Category, selectedCategory)) return false;
+    if (selectedDeeniKaam && !sameClient(row["Deeni Kaam"], selectedDeeniKaam)) return false;
+    if (selectedField && !sameClient(row.Fields, selectedField)) return false;
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase().trim();
+      const hay = [row.Region,row.State,row.Division,row.District,row.Category,row["Deeni Kaam"],
+        row.Fields,row["Multiple Field Name"],row["Multiple Field Value"]].join(" ").toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  };
+
+  const aggregatePeriod = (period, groupValue, groupLevel, field) => {
+    if (!period) return { report: 0, target26: 0, target52: 0 };
+    let report = 0, target26 = 0, target52 = 0;
+
+    for (const r of rawData) {
+      if (r.Month !== period || !baseMatches(r)) continue;
+      if (field && !sameClient(r.Fields, field)) continue;
+
+      if (groupLevel === "State" && !sameClient(r.State, groupValue)) continue;
+      if (groupLevel === "Division" && !sameClient(r.Division, groupValue)) continue;
+      if (groupLevel === "District" && !sameClient(r.District, groupValue)) continue;
+
+      report += r.Report;
+      target26 += r.Target26;
+      target52 += r.Target52;
+    }
+    return { report, target26, target52 };
+  };
+
   const processedTableData = useMemo(() => {
     if (!rawData.length) return [];
 
-    const latestMonth = rawData.find(r => r.NormalizedMonth)?.NormalizedMonth || "";
-    const activeMonth = endMonth || startMonth || latestMonth;
+    let groupLevel = "India";
+    let groups = [{ value: "India", level: "India" }];
 
-    const passes = (row, includeMonth = true) => {
-      if (region && !sameClient(row.Region, region)) return false;
-      if (state && !sameClient(row.State, state)) return false;
-      if (division && !sameClient(row.Division, division)) return false;
-      if (district && !sameClient(row.District, district)) return false;
-      if (selectedCategory && !sameClient(row.Category, selectedCategory)) return false;
-      if (selectedDeeniKaam && !sameClient(row["Deeni Kaam"], selectedDeeniKaam)) return false;
-      if (selectedField && !sameClient(row.Fields, selectedField)) return false;
-      if (includeMonth && activeMonth && row.NormalizedMonth !== activeMonth) return false;
-      if (searchTerm && !row._search.includes(searchTerm.trim().toLowerCase())) return false;
-      return true;
-    };
-
-    const baseFiltered = rawData.filter(row => passes(row, true));
-
-    const leftName = (r) => {
-      if (district) return "";
-      if (division) return clean(r.District) || "-";
-      if (state) return clean(r.Division) || "-";
-      if (region) return clean(r.State) || "-";
-      return clean(r.Region) || "India";
-    };
-
-    // Single-pass index: avoids repeatedly scanning hundreds of thousands of rows.
-    const index = new Map();
-    for (const r of rawData) {
-      if (!passes(r, false)) continue;
-      const month = r.NormalizedMonth;
-      const field = r.Fields || "-";
-      const dk = r["Deeni Kaam"] || "";
-      const left = leftName(r);
-      const key = `${month}|${left}|${dk}|${field}`;
-      if (!index.has(key)) index.set(key, { report: 0, target26: 0, target52: 0 });
-      const item = index.get(key);
-      item.report += r.NumericReport;
-      item.target26 += r.Target26;
-      item.target52 += r.Target52;
+    if (district) {
+      groupLevel = "District";
+      groups = [{ value: district, level: "District" }];
+    } else if (division) {
+      groupLevel = "District";
+      groups = uniqValues(rawData.filter(r =>
+        sameClient(r.Region, region) &&
+        sameClient(r.State, state) &&
+        sameClient(r.Division, division)
+      ), "District").map(value => ({ value, level: "District" }));
+    } else if (state) {
+      groupLevel = "Division";
+      groups = uniqValues(rawData.filter(r =>
+        sameClient(r.Region, region) && sameClient(r.State, state)
+      ), "Division").map(value => ({ value, level: "Division" }));
+    } else if (region) {
+      groupLevel = "State";
+      groups = uniqValues(rawData.filter(r => sameClient(r.Region, region)), "State")
+        .map(value => ({ value, level: "State" }));
     }
 
-    const getIndexed = (month, left, dk, field) =>
-      index.get(`${month}|${left}|${dk}|${field}`) || { report: 0, target26: 0, target52: 0 };
+    const fields = selectedField
+      ? [selectedField]
+      : [...new Set(rawData.filter(baseMatches).map(r => r.Fields).filter(Boolean))]
+          .sort((a,b) => a.localeCompare(b));
 
-    const rows = [];
-    const seen = new Set();
-
-    for (const r of baseFiltered) {
-      const left = leftName(r);
-      const dk = r["Deeni Kaam"] || "";
-      const field = r.Fields || "-";
-      const rowKey = `${left}|${dk}|${field}`;
-      if (seen.has(rowKey)) continue;
-      seen.add(rowKey);
-
-      const current = getIndexed(activeMonth, left, dk, field);
-      const first = startMonth ? getIndexed(startMonth, left, dk, field).report : current.report;
-      const second = endMonth ? getIndexed(endMonth, left, dk, field).report : current.report;
-
-      let comparison = 0;
-      if (first > 0) comparison = ((second - first) / first) * 100;
-      else if (second > 0) comparison = 100;
-
-      const target = selectedTargetPct === "26%" ? current.target26 : selectedTargetPct === "52%" ? current.target52 : 0;
-      const achievement = target > 0 ? (current.report / target) * 100 : null;
-
-      rows.push({
-        LeftColValue: left,
-        DeeniKaamName: dk || "-",
-        DeeniActivity: field,
-        DynamicMonthDisplay: formatMonthYearLabel(activeMonth),
-        DynamicReportValue: current.report,
-        Target26: current.target26,
-        Target52: current.target52,
-        DynamicTarget: target,
-        DynamicAchievement: achievement === null ? "-" : `${achievement.toFixed(1)}%`,
-        Val1: first,
-        Val2: second,
-        CalculatedComparison: `${comparison >= 0 ? "+" : ""}${comparison.toFixed(1)}%`
-      });
+    let targetPeriod = selectedPeriod;
+    if (!targetPeriod) {
+      targetPeriod = rawData.reduce((latest, r) => r.Month > latest ? r.Month : latest, "");
     }
+    const comparePeriod = comparisonPeriod || getPreviousMonth(targetPeriod);
 
-    return rows.sort((a,b) =>
-      `${a.LeftColValue}|${a.DeeniKaamName}|${a.DeeniActivity}`.localeCompare(
-        `${b.LeftColValue}|${b.DeeniKaamName}|${b.DeeniActivity}`
-      )
-    );
-  }, [rawData, region, state, division, district, selectedCategory, selectedDeeniKaam, selectedField, selectedTargetPct, searchTerm, startMonth, endMonth, activeTab, activeViewMode]);
+    const output = [];
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [region, state, division, district, selectedCategory, selectedDeeniKaam, selectedField, selectedTargetPct, searchTerm, startMonth, endMonth, activeTab, activeViewMode]);
+    for (const g of groups) {
+      for (const field of fields) {
+        const current = aggregatePeriod(targetPeriod, g.value, g.level, field);
+        const previous = aggregatePeriod(comparePeriod, g.value, g.level, field);
+
+        const target = selectedTargetPct === "26%" ? current.target26 :
+          selectedTargetPct === "52%" ? current.target52 :
+          0;
+
+        const comparison = previous.report > 0
+          ? ((current.report - previous.report) / previous.report) * 100
+          : (current.report > 0 ? 100 : 0);
+
+        output.push({
+          LeftColValue: district ? "" : g.value,
+          DeeniKaamName: MASTER_CATEGORIES_MAP.find(m => sameClient(m.field, field))?.deeniKaam || "",
+          DeeniActivity: field,
+          DynamicMonthDisplay: formatMonthYearLabel(targetPeriod),
+          DynamicReportValue: current.report,
+          DynamicTarget: target,
+          DynamicAchievement: target > 0 ? `${((current.report / target) * 100).toFixed(1)}%` : "-",
+          Val1: previous.report,
+          Val2: current.report,
+          CalculatedComparison: `${comparison >= 0 ? "+" : ""}${comparison.toFixed(1)}%`,
+          State: groupLevel === "State" ? g.value : "",
+          Division: groupLevel === "Division" ? g.value : "",
+          District: groupLevel === "District" ? g.value : ""
+        });
+      }
+    }
+    return output;
+  }, [
+    rawData, region, state, division, district, selectedCategory, selectedDeeniKaam,
+    selectedField, selectedTargetPct, searchTerm, startMonth, endMonth
+  ]);
 
   const pagedRows = useMemo(() => {
-    if (!Array.isArray(processedTableData)) return [];
     const start = (currentPage - 1) * rowsPerPage;
     return processedTableData.slice(start, start + rowsPerPage);
   }, [processedTableData, currentPage]);
 
-  const dynamicGraphData = useMemo(() => {
-    const key = division ? "District" : state ? "Division" : region ? "State" : "Region";
-    const map = {};
-    if (Array.isArray(processedTableData)) {
-      processedTableData.forEach(x => {
-        if (!x) return;
-        const k = String(x.LeftColValue || "Unknown").trim();
-        const n = Number(x.DynamicReportValue || 0);
-        map[k] = (map[k] || 0) + (isNaN(n) ? 0 : n);
-      });
-    }
-    return Object.keys(map).sort((a,b) => map[b] - map[a]).map(k => ({ label: k, count: map[k] }));
-  }, [processedTableData, region, state, division]);
+  useEffect(() => { setCurrentPage(1); }, [
+    region,state,division,district,selectedCategory,selectedDeeniKaam,selectedField,
+    selectedTargetPct,startMonth,endMonth,searchTerm
+  ]);
 
-  const dynamicGraphTitle = division ? "REPORTS BY DISTRICT" : state ? "REPORTS BY DIVISION" : region ? "REPORTS BY STATE" : "REPORTS BY REGION";
-  const maxDynamicCount = dynamicGraphData.length ? Math.max(...dynamicGraphData.map(d => d.count)) : 0;
+  const dynamicGraphData = useMemo(() => {
+    const map = new Map();
+    for (const x of processedTableData) {
+      const k = district ? x.DeeniActivity : (x.LeftColValue || "India");
+      map.set(k, (map.get(k) || 0) + toNumber(x.DynamicReportValue));
+    }
+    return Array.from(map, ([label,count]) => ({label,count}))
+      .sort((a,b) => b.count-a.count);
+  }, [processedTableData, district]);
+
+  const dynamicGraphTitle = division ? "REPORTS BY DISTRICT" :
+    state ? "REPORTS BY DIVISION" :
+    region ? "REPORTS BY STATE" : "INDIA TOTAL REPORT";
+
+  const maxDynamicCount = dynamicGraphData.length
+    ? Math.max(...dynamicGraphData.map(d => d.count)) : 0;
 
   const downloadExcel = () => {
     if (!processedTableData.length) return alert("No data to export");
@@ -664,7 +738,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[400px]">
-                    <MiniTable title="STATE WISE METRICS" data={groupCount(processedTableData, "State")} />
+                    <MiniTable title="STATE WISE METRICS" data={groupCount(processedTableData, "LeftColValue")} />
                     <MiniTable title="DISTRICT WISE METRICS" data={groupCount(processedTableData, "District")} />
                   </div>
                 </div>
