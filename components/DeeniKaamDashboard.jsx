@@ -423,6 +423,8 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   const [selectedCategory,setSelectedCategory] = useState("");
   const [selectedDeeniKaam,setSelectedDeeniKaam] = useState("");
   const [selectedField,setSelectedField] = useState("");
+  const [selectedChain,setSelectedChain] = useState("");
+  const [selectedDepartment,setSelectedDepartment] = useState("");
   const [selectedTarget,setSelectedTarget] = useState("52%");
   const [searchTerm,setSearchTerm] = useState("");
   const [currentPage,setCurrentPage] = useState(1);
@@ -605,24 +607,38 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
       ]);
     }
 
-    // Every month is aggregated once. The UI never scans the original
-    // hundreds-of-thousands of Google Sheet rows.
-    const monthlyMaps=new Map();
-    for (const m of months) {
-      const monthRows=aggregateForMonth(source,m,selectedLevel,baseFilters);
-      const map=new Map();
-      for (const z of monthRows) {
-        const k=`${z.groupValue}\u001F${z.deeniKaam}\u001F${z.field}\u001F${z.multiName}\u001F${z.multiValue}`;
-        const old=map.get(k);
-        if(old) {
-          old.report+=z.report;
-          old.target26+=z.target26;
-          old.target52+=z.target52;
-        } else {
-          map.set(k,{...z});
-        }
+    // PERFORMANCE: build all required month maps in ONE pass over the
+    // already compacted data instead of rescanning it once per month.
+    const monthlyMaps=new Map(months.map(m=>[m,new Map()]));
+    const wantedMonths=new Set(months);
+    for (const r of source) {
+      if (!wantedMonths.has(r.month)) continue;
+
+      let groupValue = "India";
+      if (selectedLevel === "region") groupValue = r.region || "Unknown Region";
+      else if (selectedLevel === "state") groupValue = r.state || "Unknown State";
+      else if (selectedLevel === "division") groupValue = r.division || "Unknown Division";
+      else if (selectedLevel === "district") groupValue = r.district || "Unknown District";
+
+      const key=`${groupValue}\u001F${r.deeniKaam}\u001F${r.field}\u001F${r.multiName}\u001F${r.multiValue}`;
+      const map=monthlyMaps.get(r.month);
+      const old=map.get(key);
+      if(old) {
+        old.report+=r.report;
+        old.target26+=r.target26;
+        old.target52+=r.target52;
+      } else {
+        map.set(key,{
+          groupValue,
+          deeniKaam:r.deeniKaam,
+          field:r.field,
+          multiName:r.multiName,
+          multiValue:r.multiValue,
+          report:r.report,
+          target26:r.target26,
+          target52:r.target52
+        });
       }
-      monthlyMaps.set(m,map);
     }
 
     let endMap=monthlyMaps.get(effectiveEnd) || new Map();
@@ -822,7 +838,7 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
   };
 
   const geoDisabled=(key)=>
-    officeUser?.[key] && officeUser[key].toLowerCase()!=="all";
+    Boolean(officeUser?.[key] && String(officeUser[key]).toLowerCase()!=="all");
 
   return (
     <div className="min-h-screen bg-[#e0f2f1] text-slate-800 font-sans relative overflow-hidden">
