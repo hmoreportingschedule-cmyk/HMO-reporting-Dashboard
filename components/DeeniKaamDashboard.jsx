@@ -60,17 +60,91 @@ const MASTER_CATEGORIES_MAP = [
   { category: "Monthly", deeniKaam: "Neak Aamal", field: "Neak Aamal Risala Wasool" }
 ];
 
-const parseSheet = (url) => {
-  return new Promise((resolve, reject) => {
-    Papa.parse(url, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      worker: true,
-      complete: (results) => resolve(results?.data || []),
-      error: (err) => reject(err)
-    });
+const extractGoogleSheetId = (url) => {
+  const m = String(url || "").match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return m ? m[1] : "";
+};
+
+// Google Sheets CSV export can be blocked by browser CORS in some deployments.
+// JSONP through the Visualization endpoint avoids that browser-side CORS problem
+// for sheets that are shared/published for public access.
+const parseGoogleSheetJSONP = (url) => new Promise((resolve, reject) => {
+  const spreadsheetId = extractGoogleSheetId(url);
+  if (!spreadsheetId) {
+    reject(new Error("Invalid Google Sheet URL"));
+    return;
+  }
+
+  const callbackName = `__gs_cb_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const script = document.createElement("script");
+  const timeoutId = window.setTimeout(() => {
+    cleanup();
+    reject(new Error("Google Sheet request timed out"));
+  }, 30000);
+
+  const cleanup = () => {
+    window.clearTimeout(timeoutId);
+    try { delete window[callbackName]; } catch (_) { window[callbackName] = undefined; }
+    if (script.parentNode) script.parentNode.removeChild(script);
+  };
+
+  window[callbackName] = (payload) => {
+    try {
+      if (!payload || payload.status !== "ok" || !payload.table) {
+        throw new Error("Google Sheet is not publicly readable");
+      }
+      const cols = (payload.table.cols || []).map((c, i) => String(c.label || c.id || `Column_${i + 1}`).trim());
+      const rows = (payload.table.rows || []).map((r) => {
+        const obj = {};
+        cols.forEach((key, i) => {
+          const cell = r?.c?.[i];
+          obj[key] = cell?.f ?? cell?.v ?? "";
+        });
+        return obj;
+      });
+      cleanup();
+      resolve(rows);
+    } catch (e) {
+      cleanup();
+      reject(e);
+    }
+  };
+
+  const base = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq`;
+  script.src = `${base}?tqx=out:json;responseHandler:${encodeURIComponent(callbackName)}&headers=1`;
+  script.async = true;
+  script.onerror = () => {
+    cleanup();
+    reject(new Error("Google Sheet could not be loaded"));
+  };
+  document.head.appendChild(script);
+});
+
+const parseSheetCSVFallback = (url) => new Promise((resolve, reject) => {
+  Papa.parse(url, {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    worker: true,
+    complete: (results) => {
+      if (results?.errors?.length && !results?.data?.length) {
+        reject(new Error("CSV parse failed"));
+        return;
+      }
+      resolve(results?.data || []);
+    },
+    error: (err) => reject(err)
   });
+});
+
+const parseSheet = async (url) => {
+  try {
+    const rows = await parseGoogleSheetJSONP(url);
+    if (rows.length) return rows;
+  } catch (jsonpError) {
+    console.warn("Google Visualization sync failed; trying CSV fallback.", jsonpError);
+  }
+  return parseSheetCSVFallback(url);
 };
 
 const sameClient = (a, b) =>
@@ -283,23 +357,39 @@ export default function DeeniKaamDashboard({ onBack, onLogout, officeUser }) {
     setFetchError("");
     try {
       const allRows = [];
-      // Sequentially download large CSVs so the browser does not hold 3 full files at once.
-      for (const url of SHEET_URLS) {
-        const rows = await parseSheet(url);
-        allRows.push(...rows);
+      const failedSheets = [];
+
+      // Keep downloads sequential: large sheets should not all sit in memory together.
+      for (let i = 0; i < SHEET_URLS.length; i += 1) {
+        const url = SHEET_URLS[i];
+        try {
+          const rows = await parseSheet(url);
+          if (Array.isArray(rows) && rows.length) {
+            allRows.push(...rows);
+          } else {
+            failedSheets.push(i + 1);
+          }
+        } catch (sheetError) {
+          console.error(`Google Sheet ${i + 1} sync failed`, sheetError);
+          failedSheets.push(i + 1);
+        }
       }
+
       const compact = aggregateRows(allRows);
       if (compact.length) {
         setRawData(compact);
         setCurrentPage(1);
+        if (failedSheets.length) {
+          setFetchError(`Data synced from available Google Sheets. Sheet ${failedSheets.join(", ")} could not be read; please make those sheets "Anyone with the link" / Published and try Sync again.`);
+        }
       } else {
         setRawData([]);
-        setFetchError("Google Sheet se valid data nahi mila. Month/Year aur Fields columns check karein.");
+        setFetchError("Google Sheet se data read nahi ho raha. Google Sheet ko 'Anyone with the link → Viewer' ya 'Publish to web' karein, phir Sync dabayein.");
       }
     } catch (err) {
       console.error(err);
       setRawData([]);
-      setFetchError("Google Sheet sync failed. Please check sharing permission and URL.");
+      setFetchError("Google Sheet sync failed. Please make the sheet publicly readable and verify the Google Sheet URL.");
     } finally {
       setLoading(false);
     }
